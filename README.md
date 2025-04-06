@@ -1,9 +1,14 @@
-# model
+# Model
 
-# Setup
-# python -m venv venv
-# .\venv\Scripts\activate
-# pip install uv
-# uv sync --all-extras --dev
-# uv run main.py
-# uv run main.py
+## Setup
+
+### Install uv
+
+https://docs.astral.sh/uv/getting-started/installation/
+
+```bash
+python -m venv venv
+.\venv\Scripts\activate
+uv sync --all-extras --dev
+uv run main.py
+```
