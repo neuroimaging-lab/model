@@ -172,3 +172,11 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+### Custom files ###
+
+.DS_Store
+.spr.yml
+
+datasets/*
+!datasets/.gitkeep
