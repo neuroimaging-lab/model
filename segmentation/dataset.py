@@ -141,3 +141,25 @@ class BrainTumorDataset(Dataset):
     def get_label_mapping(self) -> Dict[int, str]:
         """Return the mapping from label indices to their descriptions."""
         return {int(k): v for k, v in self.dataset_info["labels"].items()}
+
+
+# Example usage
+if __name__ == "__main__":
+    current_dir = Path(__file__).parent
+    project_root = current_dir.parent
+    dataset_dir = project_root / "datasets" / "Task01_BrainTumour"
+
+    train_dataset = BrainTumorDataset(
+        root_dir=str(dataset_dir),
+        split="train",
+        modalities=["FLAIR", "T1w", "t1gd", "T2w"],
+    )
+
+    print(f"Dataset size: {len(train_dataset)} samples")
+    print(f"Label mapping: {train_dataset.get_label_mapping()}")
+
+    image, mask = train_dataset[0]
+    print(f"Image shape: {image.shape}, dtype: {image.dtype}")
+    if mask is not None:
+        print(f"Mask shape: {mask.shape}, dtype: {mask.dtype}")
+        print(f"Unique labels: {torch.unique(mask)}")
