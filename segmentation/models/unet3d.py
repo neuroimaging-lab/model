@@ -10,7 +10,6 @@ source: https://arxiv.org/abs/1606.06650
 from typing import List, Tuple
 from torch import nn
 import torch
-from torchsummary import summary  # type: ignore
 
 
 class ConvBlock(nn.Module):
@@ -157,11 +156,3 @@ class UNet3D(nn.Module):
         x = self.up2(x, res2)
         x = self.up1(x, res1)
         return x
-
-
-if __name__ == "__main__":
-    model = UNet3D(
-        in_channels=3,
-        num_classes=1,
-    )
-    summary(model=model, input_size=(3, 16, 128, 128), batch_size=-1, device="cpu")
