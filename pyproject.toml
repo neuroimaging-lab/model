@@ -6,6 +6,9 @@ readme = "README.md"
 requires-python = ">=3.12.8"
 dependencies = [
     "nibabel>=5.3.2",
+    "numpy>=1.26.4",
+    "torch>=2.7.0",
+    "torchsummary>=1.5.1",
 ]
 
 
