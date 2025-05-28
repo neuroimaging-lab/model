@@ -1,3 +1,8 @@
+import torch
+from torch import nn
+from typing import List, Tuple
+
+
 """
 3D U-Net implementation for volumetric image segmentation.
 
@@ -6,11 +11,6 @@ for medical image segmentation tasks.
 
 source: https://arxiv.org/abs/1606.06650
 """
-
-from typing import List, Tuple
-from torch import nn
-import torch
-
 
 class ConvBlock(nn.Module):
     """

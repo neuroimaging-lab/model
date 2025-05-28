@@ -6,9 +6,9 @@
 
 https://docs.astral.sh/uv/getting-started/installation/
 
+
 ```bash
-python -m venv venv
-.\venv\Scripts\activate
-uv sync --all-extras --dev
-uv run main.py
+uv venv                                     # creates venv
+uv sync --all-extras --dev                  # installs dependecies on venv
+uv run -m segmentation.examples.models      # this is how to run .py files
 ```

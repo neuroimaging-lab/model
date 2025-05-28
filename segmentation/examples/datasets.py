@@ -1,6 +1,6 @@
 from pathlib import Path
-from segmentation.dataset import BrainTumorDataset
 import torch
+from segmentation.dataset import BrainTumorDataset
 from segmentation.transforms import train_transforms
 
 
