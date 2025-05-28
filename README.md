@@ -15,6 +15,11 @@ uv run -m segmentation.examples.models      # this is how to run .py files
 
 Format code with ruff
 ```bash
-uv run ruff format --check                  # check if there's something to format
-uv run ruff format                          # format
+uv run ruff check --select I --fix    # format imports, or run without --fix to check only
+uv run ruff format                    # format code, or run with --check
+```
+
+Format types with mypy
+```bash
+uv run mypy . --config-file pyproject.toml  # runs type linter
 ```

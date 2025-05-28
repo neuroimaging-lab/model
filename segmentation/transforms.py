@@ -1,5 +1,4 @@
-from monai.transforms import DivisiblePad, Compose
-
+from monai.transforms import Compose, DivisiblePad
 
 train_transforms = Compose(
     [
