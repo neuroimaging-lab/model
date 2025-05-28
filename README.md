@@ -12,3 +12,9 @@ uv venv                                     # creates venv
 uv sync --all-extras --dev                  # installs dependencies on venv
 uv run -m segmentation.examples.models      # this is how to run .py files
 ```
+
+Format code with ruff
+```bash
+uv run ruff format --check                  # check if there's something to format
+uv run ruff format                          # format
+```
