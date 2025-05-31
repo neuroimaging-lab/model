@@ -10,6 +10,7 @@ dependencies = [
     "numpy>=1.26.4",
     "torch>=2.7.0",
     "torchsummary>=1.5.1",
+    "tqdm>=4.67.1",
 ]
 
 
@@ -25,3 +26,17 @@ exclude = [".venv"]
 known-first-party = ["segmentation"]
 force-sort-within-sections = true
 combine-as-imports = true
+
+
+[[tool.uv.index]]
+name = "pypi"
+url = "https://pypi.org/simple"
+
+
+[[tool.uv.index]]
+name = "pytorch"
+url = "https://download.pytorch.org/whl/cu128"
+
+
+[tool.uv.sources]
+torch = { index = "pytorch" }
