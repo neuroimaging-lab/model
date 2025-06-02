@@ -19,3 +19,9 @@ dev = ["ruff>=0.11.4", "mypy>=1.15.0"]
 
 [tool.mypy]
 exclude = [".venv"]
+
+
+[tool.ruff.lint.isort]
+known-first-party = ["segmentation"]
+force-sort-within-sections = true
+combine-as-imports = true

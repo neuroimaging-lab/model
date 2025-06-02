@@ -1,5 +1,6 @@
-from segmentation.models.unet3d import UNet3D
 from torchsummary import summary  # type: ignore
+
+from segmentation.models.unet3d import UNet3D
 
 
 def unet3d():
