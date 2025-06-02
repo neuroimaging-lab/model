@@ -19,7 +19,7 @@ uv run ruff check --select I --fix    # format imports, or run without --fix to 
 uv run ruff format                    # format code, or run with --check
 ```
 
-Format types with mypy
+Check typing
 ```bash
 uv run mypy . --config-file pyproject.toml  # runs type linter
 ```
