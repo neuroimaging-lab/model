@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Tuple
 
 import numpy as np
 import torch
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
 
 from segmentation.dataset import BrainTumorDataset
@@ -18,9 +18,9 @@ class Trainer:
     """
 
     def __init__(
-            self,
-            model: torch.nn.Module,
-            optimizer: torch.optim.Optimizer,
+        self,
+        model: torch.nn.Module,
+        optimizer: torch.optim.Optimizer,
     ) -> None:
         self.data_config: Dict[str, Any] = {
             "batch_size": 1,
@@ -44,6 +44,8 @@ class Trainer:
             cache_data=False,
         )
 
+        final_dataset: Dataset
+
         if total_samples > 0 and total_samples < len(full_dataset):
             indices = torch.randperm(len(full_dataset))[:total_samples].tolist()
             final_dataset = torch.utils.data.Subset(full_dataset, indices)
@@ -61,7 +63,6 @@ class Trainer:
         print(f"Training samples: {train_size}, Validation samples: {val_size}")
 
         return train_dataset, val_dataset
-
 
     def create_dataloaders(
         self,
@@ -82,7 +83,6 @@ class Trainer:
 
         return train_loader, val_loader
 
-
     def dice_loss(
         self,
         pred: torch.Tensor,
@@ -99,7 +99,6 @@ class Trainer:
 
         return loss.mean()
 
-
     def dice_coefficient(
         self,
         pred: torch.Tensor,
@@ -110,7 +109,6 @@ class Trainer:
         intersection = (pred * target).sum()
 
         return (2 * intersection) / (pred.sum() + target.sum())
-
 
     def train_one_epoch(
         self,
@@ -142,7 +140,6 @@ class Trainer:
 
         return epoch_loss / len(dataloader), float(np.mean(dice_scores))
 
-
     def validate(
         self,
         dataloader: DataLoader,
@@ -165,7 +162,6 @@ class Trainer:
                     val_loss += loss.item()
 
         return val_loss / len(dataloader), float(np.mean(dice_scores))
-
 
     def train(
         self,
@@ -197,9 +193,7 @@ class Trainer:
         for epoch in range(epochs):
             print(f"\nEpoch {epoch + 1}/{epochs}")
 
-            train_loss, train_dice = self.train_one_epoch(
-                train_loader, device
-            )
+            train_loss, train_dice = self.train_one_epoch(train_loader, device)
             train_losses.append(train_loss)
             train_dices.append(train_dice)
 

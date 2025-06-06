@@ -1,9 +1,9 @@
+from pathlib import Path
+
 import torch
 
 from segmentation.models.unet3d import UNet3D
 from segmentation.train import Trainer
-
-from pathlib import Path
 
 
 def example_train():
