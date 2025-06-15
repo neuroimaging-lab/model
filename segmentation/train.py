@@ -135,9 +135,6 @@ class Trainer:
                     dice_scores.append(dice.item())
                     epoch_loss += loss.item()
 
-                if device == "cuda":
-                    torch.cuda.empty_cache()
-
         return epoch_loss / len(dataloader), float(np.mean(dice_scores))
 
     def validate(
