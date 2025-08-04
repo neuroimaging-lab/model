@@ -1,19 +1,39 @@
+from pathlib import Path
+
 import torch
+
 from segmentation.models.unet3d import UNet3D
-from segmentation.train import train, dice_loss
+from segmentation.train import Trainer
+
 
 def example_train():
+    current_dir = Path(__file__).parent
+    project_root = current_dir.parent.parent
+    dataset_dir = project_root / "datasets" / "Task01_BrainTumour"
+
     model = UNet3D(
         in_channels=4,
         num_classes=4,
         level_channels=[16, 32, 64],
-        bottleneck_channels=128
+        bottleneck_channels=128,
     )
-    
-    criterion = dice_loss
+
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
-    
-    train(model, criterion, optimizer)
+
+    trainer = Trainer(
+        model=model,
+        optimizer=optimizer,
+    )
+
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    trainer.train(
+        dataset_dir=dataset_dir,
+        total_samples=10,
+        epochs=3,
+        device=device,
+    )
+
 
 if __name__ == "__main__":
     example_train()

@@ -8,8 +8,9 @@ source: https://arxiv.org/abs/1606.06650
 """
 
 from typing import List, Tuple
-from torch import nn
+
 import torch
+from torch import nn
 
 
 class ConvBlock(nn.Module):

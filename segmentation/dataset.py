@@ -1,13 +1,13 @@
-import os
 import json
-from typing import Dict, List, Tuple, Union, Optional, Callable, cast
-from nibabel.spatialimages import SpatialImage
+import os
+from pathlib import Path
+from typing import Callable, Dict, List, Optional, Tuple, Union, cast
 
+import nibabel as nib
+from nibabel.spatialimages import SpatialImage
 import numpy as np
 import torch
 from torch.utils.data import Dataset
-import nibabel as nib
-from pathlib import Path
 
 
 class BrainTumorDataset(Dataset):
