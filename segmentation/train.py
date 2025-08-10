@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import time
 from datetime import datetime, timedelta
 from pathlib import Path
+import time
 from typing import Any, Dict, List, Tuple
 
 import numpy as np
@@ -61,6 +61,8 @@ class Trainer:
             target_transform=train_transforms,
             cache_data=False,
         )
+
+        final_dataset: torch.utils.data.Dataset
 
         if total_samples > 0 and total_samples < len(full_dataset):
             subset_size = total_samples
@@ -202,7 +204,12 @@ class Trainer:
                 images = images.to(device, non_blocking=True)
                 masks = masks.to(device, non_blocking=True)
 
-                masks = self._ensure_class_indices(masks, num_classes=self.model.num_classes if hasattr(self.model, "num_classes") else images.shape[1])
+                masks = self._ensure_class_indices(
+                    masks,
+                    num_classes=self.model.num_classes
+                    if hasattr(self.model, "num_classes")
+                    else images.shape[1],
+                )
 
                 self.optimizer.zero_grad(set_to_none=True)
                 outputs = self.model(images)
@@ -216,9 +223,13 @@ class Trainer:
                     dice_scores.append(dice.item())
                     epoch_loss += loss.item()
 
-                progress.set_postfix({"loss": f"{loss.item():.4f}", "dice": f"{dice_scores[-1]:.4f}"})
+                progress.set_postfix(
+                    {"loss": f"{loss.item():.4f}", "dice": f"{dice_scores[-1]:.4f}"}
+                )
 
-        return epoch_loss / max(1, len(dataloader)), float(np.mean(dice_scores) if dice_scores else 0.0)
+        return epoch_loss / max(1, len(dataloader)), float(
+            np.mean(dice_scores) if dice_scores else 0.0
+        )
 
     def validate(
         self,
@@ -235,7 +246,12 @@ class Trainer:
                     images = images.to(device, non_blocking=True)
                     masks = masks.to(device, non_blocking=True)
 
-                    masks = self._ensure_class_indices(masks, num_classes=self.model.num_classes if hasattr(self.model, "num_classes") else images.shape[1])
+                    masks = self._ensure_class_indices(
+                        masks,
+                        num_classes=self.model.num_classes
+                        if hasattr(self.model, "num_classes")
+                        else images.shape[1],
+                    )
 
                     outputs = self.model(images)
                     loss = self.dice_loss(outputs, masks)
@@ -244,9 +260,16 @@ class Trainer:
                     dice_scores.append(dice.item())
                     val_loss += loss.item()
 
-                    progress.set_postfix({"val_loss": f"{loss.item():.4f}", "val_dice": f"{dice_scores[-1]:.4f}"})
+                    progress.set_postfix(
+                        {
+                            "val_loss": f"{loss.item():.4f}",
+                            "val_dice": f"{dice_scores[-1]:.4f}",
+                        }
+                    )
 
-        return val_loss / max(1, len(dataloader)), float(np.mean(dice_scores) if dice_scores else 0.0)
+        return val_loss / max(1, len(dataloader)), float(
+            np.mean(dice_scores) if dice_scores else 0.0
+        )
 
     def train(
         self,
