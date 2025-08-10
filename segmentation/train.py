@@ -1,11 +1,14 @@
-from datetime import datetime
-from pathlib import Path
+from __future__ import annotations
+
 import time
+from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 import numpy as np
 import torch
-from torch.utils.data import DataLoader, Dataset
+import torch.nn.functional as F
+from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from segmentation.dataset import BrainTumorDataset
@@ -15,26 +18,41 @@ from segmentation.transforms import train_transforms
 class Trainer:
     """
     Trainer class for training and validating a brain tumor segmentation model.
+    Trains with multi-class Dice loss (no CE), and reports mean Dice (optionally excluding background).
     """
 
     def __init__(
         self,
         model: torch.nn.Module,
         optimizer: torch.optim.Optimizer,
+        *,
+        batch_size: int = 1,
+        val_split: float = 0.2,
+        save_dir: Path | str = "checkpoints",
+        num_workers: int = 2,
+        pin_memory: bool = True,
+        include_bg: bool = False,  # whether to include background in Dice loss/metric
     ) -> None:
-        self.data_config: Dict[str, Any] = {
-            "batch_size": 1,
-            "val_split": 0.2,
-            "save_dir": Path("checkpoints"),
-        }
         self.model = model
         self.optimizer = optimizer
+
+        self.data_config: Dict[str, Any] = {
+            "batch_size": batch_size,
+            "val_split": val_split,
+            "save_dir": Path(save_dir),
+            "num_workers": num_workers,
+            "pin_memory": pin_memory,
+        }
+        self.include_bg = include_bg
 
     def get_datasets(
         self,
         root_dir: Path,
         total_samples: int,
     ) -> Tuple[torch.utils.data.Subset, torch.utils.data.Subset]:
+        """
+        Build the full training dataset from disk, optionally subsample, then split into train/val.
+        """
         full_dataset = BrainTumorDataset(
             root_dir=str(root_dir),
             split="train",
@@ -44,24 +62,31 @@ class Trainer:
             cache_data=False,
         )
 
-        final_dataset: Dataset
-
         if total_samples > 0 and total_samples < len(full_dataset):
-            indices = torch.randperm(len(full_dataset))[:total_samples].tolist()
-            final_dataset = torch.utils.data.Subset(full_dataset, indices)
+            subset_size = total_samples
+            remainder = len(full_dataset) - subset_size
+            subset, _ = torch.utils.data.random_split(
+                full_dataset, [subset_size, remainder]
+            )
+            final_dataset = subset
+            total_samples = subset_size
         else:
             final_dataset = full_dataset
             total_samples = len(full_dataset)
 
         val_size = int(self.data_config["val_split"] * total_samples)
+        val_size = max(1, val_size) if total_samples > 1 else 0
         train_size = total_samples - val_size
+
+        # Ensure at least one training sample if possible
+        if train_size == 0 and total_samples > 0:
+            train_size, val_size = 1, total_samples - 1
 
         train_dataset, val_dataset = torch.utils.data.random_split(
             final_dataset, [train_size, val_size]
         )
 
         print(f"Training samples: {train_size}, Validation samples: {val_size}")
-
         return train_dataset, val_dataset
 
     def create_dataloaders(
@@ -73,59 +98,115 @@ class Trainer:
             train_dataset,
             batch_size=self.data_config["batch_size"],
             shuffle=True,
+            num_workers=self.data_config["num_workers"],
+            pin_memory=self.data_config["pin_memory"],
         )
 
         val_loader = DataLoader(
             val_dataset,
             batch_size=self.data_config["batch_size"],
             shuffle=False,
+            num_workers=self.data_config["num_workers"],
+            pin_memory=self.data_config["pin_memory"],
         )
 
         return train_loader, val_loader
 
+    def _ensure_class_indices(
+        self, target: torch.Tensor, num_classes: int
+    ) -> torch.Tensor:
+        """
+        Ensure target is class indices tensor of shape (B, 1, D, H, W), dtype long.
+        Accepts:
+          - (B, 1, D, H, W) with ints
+          - (B, C, D, H, W) one-hot (will be argmaxed)
+          - (B, D, H, W) (will add channel dim)
+        """
+        if target.ndim == 5 and target.shape[1] == 1:
+            tgt = target.squeeze(1)
+        elif target.ndim == 5 and target.shape[1] == num_classes:
+            tgt = torch.argmax(target, dim=1)
+        elif target.ndim == 4:
+            tgt = target
+        else:
+            raise ValueError(f"Unexpected target shape: {tuple(target.shape)}")
+
+        if tgt.dtype != torch.long:
+            tgt = tgt.long()
+        return tgt.unsqueeze(1)
+
     def dice_loss(
         self,
-        pred: torch.Tensor,
-        target: torch.Tensor,
+        logits: torch.Tensor,  # (B, C, D, H, W)
+        target: torch.Tensor,  # (B, 1, D, H, W) containing class indices (int)
+        eps: float = 1e-6,
     ) -> torch.Tensor:
-        pred = pred.contiguous()
-        target = target.contiguous()
+        """
+        Multi-class soft Dice loss (probabilities vs one-hot target).
+        Background is excluded by default (self.include_bg = False).
+        """
+        probs = F.softmax(logits, dim=1)  # (B, C, D, H, W)
+        c = probs.shape[1]
 
-        # tensor shape: (batch_size, num_classes, depth, height, width)
-        intersection = (pred * target).sum(dim=(2, 3, 4))
-        loss = 1 - (
-            (2 * intersection) / (pred.sum(dim=(2, 3, 4)) + target.sum(dim=(2, 3, 4)))
-        )
+        tgt = target.squeeze(1).long()  # (B, D, H, W)
+        one_hot = F.one_hot(tgt, num_classes=c).permute(0, 4, 1, 2, 3).float()
 
-        return loss.mean()
+        if not self.include_bg and c > 1:
+            probs = probs[:, 1:, ...]
+            one_hot = one_hot[:, 1:, ...]
+
+        dims = (0, 2, 3, 4)  # sum over batch + spatial dims, per-class
+        intersection = (probs * one_hot).sum(dim=dims)
+        denom = probs.sum(dim=dims) + one_hot.sum(dim=dims)
+        dice_per_class = (2.0 * intersection + eps) / (denom + eps)
+        return 1.0 - dice_per_class.mean()
 
     def dice_coefficient(
         self,
-        pred: torch.Tensor,
-        target: torch.Tensor,
-        threshold: float = 0.5,
+        logits: torch.Tensor,  # (B, C, D, H, W)
+        target: torch.Tensor,  # (B, 1, D, H, W) containing class indices (int)
+        eps: float = 1e-6,
     ) -> torch.Tensor:
-        pred = (pred > threshold).float()
-        intersection = (pred * target).sum()
+        """
+        Multi-class Dice on argmax predictions. Returns mean Dice across classes.
+        Background is excluded by default (self.include_bg = False).
+        """
+        preds = torch.argmax(logits, dim=1)  # (B, D, H, W)
+        c = logits.shape[1]
+        tgt = target.squeeze(1).long()  # (B, D, H, W)
 
-        return (2 * intersection) / (pred.sum() + target.sum())
+        pred_oh = F.one_hot(preds, num_classes=c).permute(0, 4, 1, 2, 3).float()
+        tgt_oh = F.one_hot(tgt, num_classes=c).permute(0, 4, 1, 2, 3).float()
+
+        if not self.include_bg and c > 1:
+            pred_oh = pred_oh[:, 1:, ...]
+            tgt_oh = tgt_oh[:, 1:, ...]
+
+        dims = (0, 2, 3, 4)
+        inter = (pred_oh * tgt_oh).sum(dim=dims)
+        denom = pred_oh.sum(dim=dims) + tgt_oh.sum(dim=dims)
+        dice_per_class = (2.0 * inter + eps) / (denom + eps)
+        return dice_per_class.mean()
 
     def train_one_epoch(
         self,
         dataloader: DataLoader,
         device: str,
-    ) -> tuple[float, float]:
+    ) -> Tuple[float, float]:
         self.model.train()
         epoch_loss: float = 0.0
         dice_scores: List[float] = []
 
         with tqdm(dataloader, desc="Training") as progress:
             for _, (images, masks) in enumerate(progress):
-                images, masks = images.to(device), masks.to(device)
+                images = images.to(device, non_blocking=True)
+                masks = masks.to(device, non_blocking=True)
 
-                self.optimizer.zero_grad()
+                masks = self._ensure_class_indices(masks, num_classes=self.model.num_classes if hasattr(self.model, "num_classes") else images.shape[1])
 
+                self.optimizer.zero_grad(set_to_none=True)
                 outputs = self.model(images)
+
                 loss = self.dice_loss(outputs, masks)
                 loss.backward()
                 self.optimizer.step()
@@ -135,13 +216,15 @@ class Trainer:
                     dice_scores.append(dice.item())
                     epoch_loss += loss.item()
 
-        return epoch_loss / len(dataloader), float(np.mean(dice_scores))
+                progress.set_postfix({"loss": f"{loss.item():.4f}", "dice": f"{dice_scores[-1]:.4f}"})
+
+        return epoch_loss / max(1, len(dataloader)), float(np.mean(dice_scores) if dice_scores else 0.0)
 
     def validate(
         self,
         dataloader: DataLoader,
         device: str,
-    ) -> tuple[float, float]:
+    ) -> Tuple[float, float]:
         self.model.eval()
         val_loss: float = 0.0
         dice_scores: List[float] = []
@@ -149,7 +232,10 @@ class Trainer:
         with torch.no_grad():
             with tqdm(dataloader, desc="Validation") as progress:
                 for _, (images, masks) in enumerate(progress):
-                    images, masks = images.to(device), masks.to(device)
+                    images = images.to(device, non_blocking=True)
+                    masks = masks.to(device, non_blocking=True)
+
+                    masks = self._ensure_class_indices(masks, num_classes=self.model.num_classes if hasattr(self.model, "num_classes") else images.shape[1])
 
                     outputs = self.model(images)
                     loss = self.dice_loss(outputs, masks)
@@ -158,7 +244,9 @@ class Trainer:
                     dice_scores.append(dice.item())
                     val_loss += loss.item()
 
-        return val_loss / len(dataloader), float(np.mean(dice_scores))
+                    progress.set_postfix({"val_loss": f"{loss.item():.4f}", "val_dice": f"{dice_scores[-1]:.4f}"})
+
+        return val_loss / max(1, len(dataloader)), float(np.mean(dice_scores) if dice_scores else 0.0)
 
     def train(
         self,
@@ -166,6 +254,7 @@ class Trainer:
         total_samples: int = -1,
         epochs: int = 5,
         device: str = "cpu",
+        checkpoints_enabled: bool = False,
     ) -> Dict[str, Any]:
         train_dataset, val_dataset = self.get_datasets(dataset_dir, total_samples)
         train_loader, val_loader = self.create_dataloaders(train_dataset, val_dataset)
@@ -178,11 +267,6 @@ class Trainer:
         save_dir = self.data_config["save_dir"] / f"run_{timestamp}"
         save_dir.mkdir(exist_ok=True, parents=True)
 
-        train_losses: List[float] = []
-        val_losses: List[float] = []
-        train_dices: List[float] = []
-        val_dices: List[float] = []
-
         print(f"Training on device: {device}")
 
         start = time.time()
@@ -191,15 +275,21 @@ class Trainer:
             print(f"\nEpoch {epoch + 1}/{epochs}")
 
             train_loss, train_dice = self.train_one_epoch(train_loader, device)
-            train_losses.append(train_loss)
-            train_dices.append(train_dice)
-
             val_loss, val_dice = self.validate(val_loader, device)
-            val_losses.append(val_loss)
-            val_dices.append(val_dice)
 
             print(f"Train Loss: {train_loss:.4f}, Train Dice: {train_dice:.4f}")
-            print(f"Val Loss: {val_loss:.4f}, Val Dice: {val_dice:.4f}")
+            print(f"Val   Loss: {val_loss:.4f}, Val   Dice: {val_dice:.4f}")
+
+            if checkpoints_enabled:
+                torch.save(
+                    {
+                        "epoch": epoch,
+                        "model_state_dict": self.model.state_dict(),
+                        "optimizer_state_dict": self.optimizer.state_dict(),
+                        "val_dice": val_dice,
+                    },
+                    save_dir / f"epoch_{epoch}.pth",
+                )
 
             if val_dice > best_val_dice:
                 best_val_dice = val_dice
@@ -215,17 +305,12 @@ class Trainer:
                 print(f"Saved best model with Dice score: {val_dice:.4f}")
 
         train_time = time.time() - start
-
-        print(
-            f"Training completed in {train_time:.2f} seconds ({train_time / 60:.2f} minutes)"
-        )
+        train_time = int(train_time)
+        print(f"Training completed in {timedelta(seconds=train_time)}")
 
         return {
-            "model": self.model,
-            "best_dice": best_val_dice,
-            "train_losses": train_losses,
-            "val_losses": val_losses,
-            "train_dices": train_dices,
-            "val_dices": val_dices,
-            "train_time": train_time,
+            "best_val_dice": best_val_dice,
+            "save_dir": str(save_dir),
+            "epochs": epochs,
+            "train_time_sec": train_time,
         }
