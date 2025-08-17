@@ -62,7 +62,7 @@ class Trainer:
         best_val_dice: float = 0.0
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        save_dir = self.data_config["save_dir"] / f"run_{timestamp}"
+        save_dir: Path = self.data_config["save_dir"] / f"run_{timestamp}"
         save_dir.mkdir(exist_ok=True, parents=True)
 
         print(f"Training on device: {device}")
@@ -135,18 +135,18 @@ class Trainer:
             final_dataset = subset
         else:
             final_dataset = full_dataset
-        
-        total_samples = len(final_dataset)
+
+        total_samples = final_dataset.__sizeof__()
         val_size = int(self.data_config["val_split"] * total_samples)
         val_size = max(1, val_size) if total_samples > 1 else 0
         train_size = total_samples - val_size
 
         if train_size <= 0 or val_size <= 0:
-            raise ValueError(f"Insufficient samples for training and validation splits: {total_samples}")
+            raise ValueError(
+                f"Insufficient samples for training and validation splits: {total_samples}"
+            )
 
-        train_dataset = torch.utils.data.Subset(
-            final_dataset, range(train_size)
-        )
+        train_dataset = torch.utils.data.Subset(final_dataset, range(train_size))
 
         val_dataset = torch.utils.data.Subset(
             final_dataset, range(train_size, total_samples)
@@ -168,7 +168,7 @@ class Trainer:
             num_workers=self.data_config["num_workers"],
             persistent_workers=True,
             pin_memory=self.data_config["pin_memory"],
-        ) # We are shuffling the training data for better generalization
+        )  # We are shuffling the training data for better generalization
 
         val_loader = DataLoader(
             val_dataset,
@@ -207,7 +207,7 @@ class Trainer:
 
         if tgt.dtype != torch.long:
             tgt = tgt.long()
-            
+
         return tgt.unsqueeze(1)
 
     def _dice_loss(
@@ -232,7 +232,12 @@ class Trainer:
             probs = probs[:, 1:, ...]
             one_hot = one_hot[:, 1:, ...]
 
-        dims = (0, 2, 3, 4)  # Summing over batch (which is typically 1) and spatial dimensions for each class
+        dims = (
+            0,
+            2,
+            3,
+            4,
+        )  # Summing over batch (which is typically 1) and spatial dimensions for each class
 
         # In intersection section it is basically multiplying vectors like [0.1, 0.2, 0.5, 0.2] by [0, 1, 0, 0],
         # which results in [0, 0.2, 0, 0], then summing. This `soft` approach allows for partial credit,
@@ -242,7 +247,7 @@ class Trainer:
 
         # In the denominator, we sum the probabilities and one-hot vectors
         denom = probs.sum(dim=dims) + one_hot.sum(dim=dims)
-        
+
         dice_per_class = (2.0 * intersection + eps) / (denom + eps)
 
         return 1.0 - dice_per_class.mean()
@@ -267,7 +272,7 @@ class Trainer:
 
         dims = (0, 2, 3, 4)
 
-        # Here we no longer have floats in pred vectors, now we use argmax, so we have hard predictions 
+        # Here we no longer have floats in pred vectors, now we use argmax, so we have hard predictions
         # and the only way to get non 0 value, is if the class is the same in both pred and tgt
         intersection = (pred * tgt).sum(dim=dims)
         denom = pred.sum(dim=dims) + tgt.sum(dim=dims)
@@ -332,9 +337,7 @@ class Trainer:
 
                     masks = self._ensure_class_indices(
                         masks,
-                        num_classes=self.model.num_classes
-                        if hasattr(self.model, "num_classes")
-                        else images.shape[1],
+                        num_classes=images.shape[1],
                     )
 
                     outputs = self.model(images)
@@ -354,10 +357,10 @@ class Trainer:
         return val_loss / max(1, len(dataloader)), float(
             np.mean(dice_scores) if dice_scores else 0.0
         )
-    
+
     def _save_model(
         self,
-        save_dir: str,
+        save_dir: Path,
         epoch: int,
         model_state_dict: dict[str, Any],
         optimizer_state_dict: dict[str, Any],
@@ -365,7 +368,11 @@ class Trainer:
         is_best_model: bool = False,
     ) -> None:
         """Save the model and optimizer state dictionaries to a file."""
-        filepath = save_dir / f"epoch_{epoch}.pth" if not is_best_model else save_dir / "best_model.pth"
+        filepath = (
+            save_dir / f"epoch_{epoch}.pth"
+            if not is_best_model
+            else save_dir / "best_model.pth"
+        )
         torch.save(
             {
                 "epoch": epoch,
