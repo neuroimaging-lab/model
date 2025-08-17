@@ -11,11 +11,10 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from segmentation.config import CURR_RUN, TIMESTAMP
+from segmentation.config import CURR_RUN
 from segmentation.dataset import BrainTumorDataset
 from segmentation.transforms import train_transforms
 from util.graph_maker import GraphMaker
-from util.image_manipulation import cut_images_and_masks
 from util.metric_saver import MetricSaver
 
 
