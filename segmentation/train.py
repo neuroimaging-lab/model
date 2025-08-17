@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import timedelta
 from pathlib import Path
 import time
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, Union
 
 import numpy as np
 import torch
@@ -136,6 +136,8 @@ class Trainer:
             target_transform=train_transforms,
             cache_data=False,
         )
+
+        final_dataset: Union[BrainTumorDataset, torch.utils.data.Subset[Any]]
 
         if max_total_samples > 0 and max_total_samples < len(full_dataset):
             final_dataset = torch.utils.data.Subset(
