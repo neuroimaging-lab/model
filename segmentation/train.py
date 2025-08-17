@@ -305,15 +305,16 @@ class Trainer:
         dice_scores: List[float] = []
 
         with tqdm(dataloader, desc="Training") as progress:
-            for _, (images, masks) in enumerate(progress):
+            for i, (images, masks) in enumerate(progress):
                 images, masks = self._prepare_images_and_masks(images, masks, device)
 
                 self.optimizer.zero_grad(set_to_none=True)
                 outputs = self.model(images)
 
-                self.graph_maker.set_prediction_and_ground_truth_slice(
-                    outputs, masks, slice_idx=30
-                )
+                if i == 0:
+                    self.graph_maker.set_prediction_and_ground_truth_slice(
+                        outputs, masks
+                    )
 
                 loss = self._dice_loss(outputs, masks)
                 loss.backward()
