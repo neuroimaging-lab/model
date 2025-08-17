@@ -128,28 +128,30 @@ class Trainer:
         )
 
         final_dataset: torch.utils.data.Dataset
+        final_samples: int
 
         if total_samples > 0 and total_samples < len(full_dataset):
             subset_size = total_samples
             subset = torch.utils.data.Subset(full_dataset, range(subset_size))
             final_dataset = subset
+            final_samples = subset_size
         else:
             final_dataset = full_dataset
+            final_samples = len(full_dataset)
 
-        total_samples = final_dataset.__sizeof__()
-        val_size = int(self.data_config["val_split"] * total_samples)
-        val_size = max(1, val_size) if total_samples > 1 else 0
-        train_size = total_samples - val_size
+        val_size = int(self.data_config["val_split"] * final_samples)
+        val_size = max(1, val_size) if final_samples > 1 else 0
+        train_size = final_samples - val_size
 
         if train_size <= 0 or val_size <= 0:
             raise ValueError(
-                f"Insufficient samples for training and validation splits: {total_samples}"
+                f"Insufficient samples for training and validation splits: {final_samples}"
             )
 
         train_dataset = torch.utils.data.Subset(final_dataset, range(train_size))
 
         val_dataset = torch.utils.data.Subset(
-            final_dataset, range(train_size, total_samples)
+            final_dataset, range(train_size, final_samples)
         )
 
         print(f"Training samples: {train_size}, Validation samples: {val_size}")
