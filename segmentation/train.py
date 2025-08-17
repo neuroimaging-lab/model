@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 from pathlib import Path
 import time
 from typing import Any, Dict, List, Tuple
@@ -11,10 +11,12 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+from segmentation.config import CURR_RUN, TIMESTAMP
 from segmentation.dataset import BrainTumorDataset
 from segmentation.transforms import train_transforms
 from util.graph_maker import GraphMaker
 from util.image_manipulation import cut_images_and_masks
+from util.metric_saver import MetricSaver
 
 
 class Trainer:
@@ -48,6 +50,7 @@ class Trainer:
 
         self.include_bg = include_bg
         self.graph_maker = GraphMaker()
+        self.metric_saver = MetricSaver()
 
     def train(
         self,
@@ -64,8 +67,7 @@ class Trainer:
 
         best_val_dice: float = 0.0
 
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        save_dir: Path = self.data_config["save_dir"] / f"run_{timestamp}"
+        save_dir: Path = self.data_config["save_dir"] / CURR_RUN
         save_dir.mkdir(exist_ok=True, parents=True)
 
         print(f"Training on device: {device}")
@@ -83,6 +85,8 @@ class Trainer:
 
             val_loss, val_dice = self._validate(val_loader, device)
             print(f"Val Loss: {val_loss:.4f}, Val   Dice: {val_dice:.4f}")
+
+            self.metric_saver.save(epoch, train_dice, val_dice)
 
             if checkpoints_enabled:
                 self._save_model(

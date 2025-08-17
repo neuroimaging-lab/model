@@ -1,10 +1,11 @@
-from datetime import datetime
 import os
 from typing import Optional
 
 import matplotlib.pyplot as plt
 from PIL import Image
 import torch
+
+from segmentation.config import METRICS_DIR
 
 
 class GraphMaker:
@@ -13,10 +14,9 @@ class GraphMaker:
         self.pred_slice = None
         self.target_slice = None
 
-        timestamp = datetime.now().strftime("run_%Y%m%d_%H%M%S")
-        self.FILE_PATH = f"slices/{timestamp}/"
+        self.slices_dir_path = f"{METRICS_DIR}slices/"
 
-        os.makedirs(self.FILE_PATH)
+        os.makedirs(self.slices_dir_path)
 
     def set_prediction_and_ground_truth_slice(
         self,
@@ -43,9 +43,9 @@ class GraphMaker:
         plt.show()
 
     def save_slice(self, epoch: int, dice_score: float):
-        filepath = self.FILE_PATH + f"slice_{epoch}.png"
+        slice_path = self.slices_dir_path + f"slice_{epoch}.png"
         fig = self._create_slice_figure(epoch, dice_score)
-        fig.savefig(filepath)
+        fig.savefig(slice_path)
         plt.close(fig)
 
     def _create_slice_figure(self, epoch: int, dice_score: float):
@@ -73,7 +73,7 @@ class GraphMaker:
     ):
         slice_indices = list(range(0, epochs + 1, step))
         image_paths = [
-            os.path.join(self.FILE_PATH, f"slice_{i}.png") for i in slice_indices
+            os.path.join(self.slices_dir_path, f"slice_{i}.png") for i in slice_indices
         ]
 
         images = [Image.open(path) for path in image_paths if os.path.exists(path)]
@@ -95,5 +95,4 @@ class GraphMaker:
             y = row * img_height
             summary_img.paste(img, (x, y))
 
-        summary_img.save(os.path.join(self.FILE_PATH, output_file))
-        print(f"Saved summary image as {output_file}")
+        summary_img.save(os.path.join(METRICS_DIR, output_file))
