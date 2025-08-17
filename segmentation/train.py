@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 from pathlib import Path
 import time
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, Union
 
 import numpy as np
 import torch
@@ -11,8 +11,11 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+from segmentation.config import CURR_RUN
 from segmentation.dataset import BrainTumorDataset
 from segmentation.transforms import train_transforms
+from util.graph_maker import GraphMaker
+from util.metric_saver import MetricSaver
 
 
 class Trainer:
@@ -45,6 +48,8 @@ class Trainer:
         }
 
         self.include_bg = include_bg
+        self.graph_maker = GraphMaker()
+        self.metric_saver = MetricSaver()
 
     def train(
         self,
@@ -61,22 +66,26 @@ class Trainer:
 
         best_val_dice: float = 0.0
 
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        save_dir: Path = self.data_config["save_dir"] / f"run_{timestamp}"
+        save_dir: Path = self.data_config["save_dir"] / CURR_RUN
         save_dir.mkdir(exist_ok=True, parents=True)
 
         print(f"Training on device: {device}")
 
         start = time.time()
 
-        for epoch in range(epochs):
-            print(f"\nEpoch {epoch + 1}/{epochs}")
+        for epoch in range(epochs + 1):
+            print(f"\nEpoch {epoch}/{epochs}")
 
             train_loss, train_dice = self._train_one_epoch(train_loader, device)
-            val_loss, val_dice = self._validate(val_loader, device)
-
             print(f"Train Loss: {train_loss:.4f}, Train Dice: {train_dice:.4f}")
-            print(f"Val   Loss: {val_loss:.4f}, Val   Dice: {val_dice:.4f}")
+
+            if epoch % 5 == 0:
+                self.graph_maker.save_slice(epoch, train_dice)
+
+            val_loss, val_dice = self._validate(val_loader, device)
+            print(f"Val Loss: {val_loss:.4f}, Val   Dice: {val_dice:.4f}")
+
+            self.metric_saver.save(epoch, train_dice, val_dice)
 
             if checkpoints_enabled:
                 self._save_model(
@@ -99,6 +108,7 @@ class Trainer:
                 )
                 print(f"Saved best model with Dice score: {val_dice:.4f}")
 
+        self.graph_maker.make_summary_of_slices(epochs)
         train_time = time.time() - start
         train_time = int(train_time)
         print(f"Training completed in {timedelta(seconds=train_time)}")
@@ -106,7 +116,7 @@ class Trainer:
     def _get_datasets(
         self,
         root_dir: Path,
-        total_samples: int,
+        max_total_samples: int,
     ) -> Tuple[torch.utils.data.Subset, torch.utils.data.Subset]:
         """
         Build the full training dataset, optionally subsample, then split into train/val.
@@ -127,34 +137,37 @@ class Trainer:
             cache_data=False,
         )
 
-        final_dataset: torch.utils.data.Dataset
-        final_samples: int
+        final_dataset: Union[BrainTumorDataset, torch.utils.data.Subset[Any]]
 
-        if total_samples > 0 and total_samples < len(full_dataset):
-            subset_size = total_samples
-            subset = torch.utils.data.Subset(full_dataset, range(subset_size))
-            final_dataset = subset
-            final_samples = subset_size
+        if max_total_samples > 0 and max_total_samples < len(full_dataset):
+            final_dataset = torch.utils.data.Subset(
+                full_dataset, range(max_total_samples)
+            )
+            total_samples = max_total_samples
         else:
             final_dataset = full_dataset
-            final_samples = len(full_dataset)
+            total_samples = final_dataset.__sizeof__()
 
-        val_size = int(self.data_config["val_split"] * final_samples)
-        val_size = max(1, val_size) if final_samples > 1 else 0
-        train_size = final_samples - val_size
-
-        if train_size <= 0 or val_size <= 0:
-            raise ValueError(
-                f"Insufficient samples for training and validation splits: {final_samples}"
-            )
+        print(f"Total samples in dataset: {total_samples}")
+        val_size = int(self.data_config["val_split"] * total_samples)
+        val_size = max(1, val_size) if total_samples > 1 else 0
+        train_size = total_samples - val_size
 
         train_dataset = torch.utils.data.Subset(final_dataset, range(train_size))
 
-        val_dataset = torch.utils.data.Subset(
-            final_dataset, range(train_size, final_samples)
-        )
+        if val_size <= 0:
+            print(
+                "No validation samples available, using the same as for the training."
+            )  # It is strictly for overfitting check on 1 sample
+            val_dataset = train_dataset
+        else:
+            val_dataset = torch.utils.data.Subset(
+                final_dataset, range(train_size, max_total_samples)
+            )
 
-        print(f"Training samples: {train_size}, Validation samples: {val_size}")
+        print(
+            f"Training samples: {len(train_dataset)}, Validation samples: {len(val_dataset)}"
+        )
         return train_dataset, val_dataset
 
     def _create_dataloaders(
@@ -293,17 +306,16 @@ class Trainer:
         dice_scores: List[float] = []
 
         with tqdm(dataloader, desc="Training") as progress:
-            for _, (images, masks) in enumerate(progress):
-                images = images.to(device, non_blocking=True)
-                masks = masks.to(device, non_blocking=True)
-
-                masks = self._ensure_class_indices(
-                    masks,
-                    num_classes=images.shape[1],
-                )
+            for i, (images, masks) in enumerate(progress):
+                images, masks = self._prepare_images_and_masks(images, masks, device)
 
                 self.optimizer.zero_grad(set_to_none=True)
                 outputs = self.model(images)
+
+                if i == 0:
+                    self.graph_maker.set_prediction_and_ground_truth_slice(
+                        outputs, masks
+                    )
 
                 loss = self._dice_loss(outputs, masks)
                 loss.backward()
@@ -334,12 +346,8 @@ class Trainer:
         with torch.no_grad():
             with tqdm(dataloader, desc="Validation") as progress:
                 for _, (images, masks) in enumerate(progress):
-                    images = images.to(device, non_blocking=True)
-                    masks = masks.to(device, non_blocking=True)
-
-                    masks = self._ensure_class_indices(
-                        masks,
-                        num_classes=images.shape[1],
+                    images, masks = self._prepare_images_and_masks(
+                        images, masks, device
                     )
 
                     outputs = self.model(images)
@@ -384,3 +392,15 @@ class Trainer:
             },
             filepath,
         )
+
+    def _prepare_images_and_masks(self, images, masks, device):
+        # images, masks = cut_images_and_masks(images, masks)
+        images = images.to(device, non_blocking=True)
+        masks = masks.to(device, non_blocking=True)
+
+        masks = self._ensure_class_indices(
+            masks,
+            num_classes=images.shape[1],
+        )
+
+        return images, masks
