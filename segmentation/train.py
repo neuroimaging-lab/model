@@ -14,6 +14,7 @@ from tqdm import tqdm
 from segmentation.dataset import BrainTumorDataset
 from segmentation.transforms import train_transforms
 from util.graph_maker import GraphMaker
+from util.image_manipulation import cut_images_and_masks
 
 
 class Trainer:
@@ -71,8 +72,8 @@ class Trainer:
 
         start = time.time()
 
-        for epoch in range(epochs):
-            print(f"\nEpoch {epoch + 1}/{epochs}")
+        for epoch in range(epochs + 1):
+            print(f"\nEpoch {epoch}/{epochs}")
 
             train_loss, train_dice = self._train_one_epoch(train_loader, device)
             print(f"Train Loss: {train_loss:.4f}, Train Dice: {train_dice:.4f}")
@@ -104,6 +105,7 @@ class Trainer:
                 )
                 print(f"Saved best model with Dice score: {val_dice:.4f}")
 
+        self.graph_maker.make_summary_of_slices(epochs)
         train_time = time.time() - start
         train_time = int(train_time)
         print(f"Training completed in {timedelta(seconds=train_time)}")
@@ -146,16 +148,21 @@ class Trainer:
         val_size = max(1, val_size) if total_samples > 1 else 0
         train_size = total_samples - val_size
 
-        if val_size <= 0:
-            print("No validation samples, using all for training.")
-
         train_dataset = torch.utils.data.Subset(final_dataset, range(train_size))
 
-        val_dataset = torch.utils.data.Subset(
-            final_dataset, range(train_size, max_total_samples)
-        )
+        if val_size <= 0:
+            print(
+                "No validation samples available, using the same as for the training."
+            )  # It is strictly for overfitting check on 1 sample
+            val_dataset = train_dataset
+        else:
+            val_dataset = torch.utils.data.Subset(
+                final_dataset, range(train_size, max_total_samples)
+            )
 
-        print(f"Training samples: {train_size}, Validation samples: {val_size}")
+        print(
+            f"Training samples: {len(train_dataset)}, Validation samples: {len(val_dataset)}"
+        )
         return train_dataset, val_dataset
 
     def _create_dataloaders(
@@ -295,13 +302,7 @@ class Trainer:
 
         with tqdm(dataloader, desc="Training") as progress:
             for _, (images, masks) in enumerate(progress):
-                images = images.to(device, non_blocking=True)
-                masks = masks.to(device, non_blocking=True)
-
-                masks = self._ensure_class_indices(
-                    masks,
-                    num_classes=images.shape[1],
-                )
+                images, masks = self._prepare_images_and_masks(images, masks, device)
 
                 self.optimizer.zero_grad(set_to_none=True)
                 outputs = self.model(images)
@@ -339,12 +340,8 @@ class Trainer:
         with torch.no_grad():
             with tqdm(dataloader, desc="Validation") as progress:
                 for _, (images, masks) in enumerate(progress):
-                    images = images.to(device, non_blocking=True)
-                    masks = masks.to(device, non_blocking=True)
-
-                    masks = self._ensure_class_indices(
-                        masks,
-                        num_classes=images.shape[1],
+                    images, masks = self._prepare_images_and_masks(
+                        images, masks, device
                     )
 
                     outputs = self.model(images)
@@ -389,3 +386,15 @@ class Trainer:
             },
             filepath,
         )
+
+    def _prepare_images_and_masks(self, images, masks, device):
+        # images, masks = cut_images_and_masks(images, masks)
+        images = images.to(device, non_blocking=True)
+        masks = masks.to(device, non_blocking=True)
+
+        masks = self._ensure_class_indices(
+            masks,
+            num_classes=images.shape[1],
+        )
+
+        return images, masks

@@ -3,6 +3,7 @@ import os
 from typing import Optional
 
 import matplotlib.pyplot as plt
+from PIL import Image
 import torch
 
 
@@ -62,3 +63,37 @@ class GraphMaker:
 
         fig.tight_layout()
         return fig
+
+    def make_summary_of_slices(
+        self,
+        epochs: int,
+        step: int = 20,
+        grid_cols: int = 2,
+        output_file: str = "summary.png",
+    ):
+        slice_indices = list(range(0, epochs + 1, step))
+        image_paths = [
+            os.path.join(self.FILE_PATH, f"slice_{i}.png") for i in slice_indices
+        ]
+
+        images = [Image.open(path) for path in image_paths if os.path.exists(path)]
+
+        if not images:
+            print("No images to combine.")
+            return
+
+        img_width, img_height = images[0].size
+        grid_rows = (len(images) + grid_cols - 1) // grid_cols
+        summary_img = Image.new(
+            "RGB", (grid_cols * img_width, grid_rows * img_height), color="white"
+        )
+
+        for idx, img in enumerate(images):
+            row = idx // grid_cols
+            col = idx % grid_cols
+            x = col * img_width
+            y = row * img_height
+            summary_img.paste(img, (x, y))
+
+        summary_img.save(os.path.join(self.FILE_PATH, output_file))
+        print(f"Saved summary image as {output_file}")
