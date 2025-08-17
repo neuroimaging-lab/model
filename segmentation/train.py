@@ -13,6 +13,7 @@ from tqdm import tqdm
 
 from segmentation.dataset import BrainTumorDataset
 from segmentation.transforms import train_transforms
+from util.graph_maker import GraphMaker
 
 
 class Trainer:
@@ -45,6 +46,7 @@ class Trainer:
         }
 
         self.include_bg = include_bg
+        self.graph_maker = GraphMaker()
 
     def train(
         self,
@@ -73,10 +75,13 @@ class Trainer:
             print(f"\nEpoch {epoch + 1}/{epochs}")
 
             train_loss, train_dice = self._train_one_epoch(train_loader, device)
-            val_loss, val_dice = self._validate(val_loader, device)
-
             print(f"Train Loss: {train_loss:.4f}, Train Dice: {train_dice:.4f}")
-            print(f"Val   Loss: {val_loss:.4f}, Val   Dice: {val_dice:.4f}")
+
+            if epoch % 5 == 0:
+                self.graph_maker.save_slice(epoch, train_dice)
+
+            val_loss, val_dice = self._validate(val_loader, device)
+            print(f"Val Loss: {val_loss:.4f}, Val   Dice: {val_dice:.4f}")
 
             if checkpoints_enabled:
                 self._save_model(
@@ -106,7 +111,7 @@ class Trainer:
     def _get_datasets(
         self,
         root_dir: Path,
-        total_samples: int,
+        max_total_samples: int,
     ) -> Tuple[torch.utils.data.Subset, torch.utils.data.Subset]:
         """
         Build the full training dataset, optionally subsample, then split into train/val.
@@ -127,29 +132,27 @@ class Trainer:
             cache_data=False,
         )
 
-        final_dataset: torch.utils.data.Dataset
-
-        if total_samples > 0 and total_samples < len(full_dataset):
-            subset_size = total_samples
-            subset = torch.utils.data.Subset(full_dataset, range(subset_size))
-            final_dataset = subset
+        if max_total_samples > 0 and max_total_samples < len(full_dataset):
+            final_dataset = torch.utils.data.Subset(
+                full_dataset, range(max_total_samples)
+            )
+            total_samples = max_total_samples
         else:
             final_dataset = full_dataset
+            total_samples = final_dataset.__sizeof__()
 
-        total_samples = final_dataset.__sizeof__()
+        print(f"Total samples in dataset: {total_samples}")
         val_size = int(self.data_config["val_split"] * total_samples)
         val_size = max(1, val_size) if total_samples > 1 else 0
         train_size = total_samples - val_size
 
-        if train_size <= 0 or val_size <= 0:
-            raise ValueError(
-                f"Insufficient samples for training and validation splits: {total_samples}"
-            )
+        if val_size <= 0:
+            print("No validation samples, using all for training.")
 
         train_dataset = torch.utils.data.Subset(final_dataset, range(train_size))
 
         val_dataset = torch.utils.data.Subset(
-            final_dataset, range(train_size, total_samples)
+            final_dataset, range(train_size, max_total_samples)
         )
 
         print(f"Training samples: {train_size}, Validation samples: {val_size}")
@@ -302,6 +305,10 @@ class Trainer:
 
                 self.optimizer.zero_grad(set_to_none=True)
                 outputs = self.model(images)
+
+                self.graph_maker.set_prediction_and_ground_truth_slice(
+                    outputs, masks, slice_idx=30
+                )
 
                 loss = self._dice_loss(outputs, masks)
                 loss.backward()
