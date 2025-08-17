@@ -18,7 +18,7 @@ def example_train():
         bottleneck_channels=128,
     )
 
-    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=3e-4)
 
     trainer = Trainer(
         model=model,
@@ -32,6 +32,7 @@ def example_train():
         total_samples=10,
         epochs=3,
         device=device,
+        checkpoints_enabled=True,
     )
 
 
