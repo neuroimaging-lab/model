@@ -79,7 +79,8 @@ class GraphMaker:
     def _create_slice_figure(self, epoch: int, dice_score: float):
 
         colors = ["darkviolet", "blue", "green", "yellow"] 
-        labels = ["Background", "Brain", "Tissue", "Cancer"]
+        labels = ["Background", "Edema", "Non-enhancing tumor", "Enhancing tumour"]
+
         ticks = [0, 1, 2, 3]
         cmap = ListedColormap(colors)
 

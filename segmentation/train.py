@@ -60,8 +60,8 @@ class Trainer:
         device: str = "cpu",
         checkpoints_enabled: bool = False,
     ) -> None:
-        train_dataset, val_dataset = self._get_datasets(dataset_dir, total_samples)
-        train_loader, val_loader = self._create_dataloaders(train_dataset, val_dataset)
+        train_dataset, val_dataset = get_datasets(self.data_config["val_split"], dataset_dir, total_samples)
+        train_loader, val_loader = create_dataloaders(self.data_config, train_dataset, val_dataset)
 
         self.model = self.model.to(device)
 
@@ -88,12 +88,11 @@ class Trainer:
 
             # self.metric_saver.save(epoch, train_dice, val_dice)
             self.metric_saver.save(epoch, train_dice, -420.69)
-            self.graph_maker.visualize_slice(epoch, train_dice)
 
             print("ELLLO")
             """
             if checkpoints_enabled:
-                self._save_model(
+                save_model(
                     save_dir=save_dir,
                     epoch=epoch,
                     model_state_dict=self.model.state_dict(),
@@ -103,7 +102,7 @@ class Trainer:
 
             if val_dice > best_val_dice:
                 best_val_dice = val_dice
-                self._save_model(
+                save_model(
                     save_dir=save_dir,
                     epoch=epoch,
                     model_state_dict=self.model.state_dict(),
@@ -119,118 +118,7 @@ class Trainer:
         train_time = int(train_time)
         print(f"Training completed in {timedelta(seconds=train_time)}")
 
-    def _get_datasets(
-        self,
-        root_dir: Path,
-        max_total_samples: int,
-    ) -> Tuple[torch.utils.data.Subset, torch.utils.data.Subset]:
-        """
-        Build the full training dataset, optionally subsample, then split into train/val.
-
-        Args:
-            root_dir: The root directory of the dataset.
-            total_samples: The total number of samples to use (-1 for all).
-
-        Returns:
-            Tuple containing the training and validation datasets.
-        """
-        full_dataset = BrainTumorDataset(
-            root_dir=str(root_dir),
-            split="train",
-            modalities=["FLAIR", "T1w", "t1gd", "T2w"],
-            transform=train_transforms,
-            target_transform=train_transforms,
-            cache_data=False,
-        )
-
-        final_dataset: Union[BrainTumorDataset, torch.utils.data.Subset[Any]]
-
-        if max_total_samples > 0 and max_total_samples < len(full_dataset):
-            final_dataset = torch.utils.data.Subset(
-                full_dataset, range(max_total_samples)
-            )
-            total_samples = max_total_samples
-        else:
-            final_dataset = full_dataset
-            total_samples = final_dataset.__sizeof__()
-
-        print(f"Total samples in dataset: {total_samples}")
-        val_size = int(self.data_config["val_split"] * total_samples)
-        val_size = max(1, val_size) if total_samples > 1 else 0
-        train_size = total_samples - val_size
-
-        train_dataset = torch.utils.data.Subset(final_dataset, range(train_size))
-
-        if val_size <= 0:
-            print(
-                "No validation samples available, using the same as for the training."
-            )  # It is strictly for overfitting check on 1 sample
-            val_dataset = train_dataset
-        else:
-            val_dataset = torch.utils.data.Subset(
-                final_dataset, range(train_size, max_total_samples)
-            )
-
-        print(
-            f"Training samples: {len(train_dataset)}, Validation samples: {len(val_dataset)}"
-        )
-        return train_dataset, val_dataset
-
-    def _create_dataloaders(
-        self,
-        train_dataset: torch.utils.data.Subset,
-        val_dataset: torch.utils.data.Subset,
-    ) -> Tuple[DataLoader, DataLoader]:
-        """Create data loaders for training and validation datasets to use during training."""
-        train_loader = DataLoader(
-            train_dataset,
-            batch_size=self.data_config["batch_size"],
-            shuffle=True,
-            num_workers=self.data_config["num_workers"],
-            persistent_workers=True,
-            pin_memory=self.data_config["pin_memory"],
-        )  # We are shuffling the training data for better generalization
-
-        val_loader = DataLoader(
-            val_dataset,
-            batch_size=self.data_config["batch_size"],
-            shuffle=False,
-            num_workers=self.data_config["num_workers"],
-            persistent_workers=True,
-            pin_memory=self.data_config["pin_memory"],
-        )
-
-        # The num_workers and pin_memory arguments are used to speed up data loading,
-        # persistent_workers is used to avoid reinitializing those workers each epoch
-
-        return train_loader, val_loader
-
-    def _ensure_class_indices(
-        self, target: torch.Tensor, num_classes: int
-    ) -> torch.Tensor:
-        """
-        Ensure target is class indices tensor of shape (B, 1, D, H, W), dtype long.
-        Accepts:
-          - (B, 1, D, H, W) with ints
-          - (B, C, D, H, W) one-hot (will be argmaxed)
-          - (B, D, H, W) (will add channel dim)
-        """
-        # We want to keep the shape consistent here, (B, D, H, W), later ensure the values are of dtype long
-        # and finally add channel dim to return tensor with shape (B, 1, D, H, W)
-        if target.ndim == 5 and target.shape[1] == 1:
-            tgt = target.squeeze(1)
-        elif target.ndim == 5 and target.shape[1] == num_classes:
-            tgt = torch.argmax(target, dim=1)
-        elif target.ndim == 4:
-            tgt = target
-        else:
-            raise ValueError(f"Unexpected target shape: {tuple(target.shape)}")
-
-        if tgt.dtype != torch.long:
-            tgt = tgt.long()
-
-        return tgt.unsqueeze(1)
-
+    
     def _dice_loss(
         self,
         logits: torch.Tensor,  # (B, C, D, H, W)
@@ -313,7 +201,7 @@ class Trainer:
 
         with tqdm(dataloader, desc="Training") as progress:
             for i, (images, masks) in enumerate(progress):
-                images, masks = self._prepare_images_and_masks(images, masks, device)
+                images, masks = prepare_images_and_masks(images, masks, device)
 
                 self.optimizer.zero_grad(set_to_none=True)
                 outputs = self.model(images)
@@ -352,7 +240,7 @@ class Trainer:
         with torch.no_grad():
             with tqdm(dataloader, desc="Validation") as progress:
                 for _, (images, masks) in enumerate(progress):
-                    images, masks = self._prepare_images_and_masks(
+                    images, masks = prepare_images_and_masks(
                         images, masks, device
                     )
 
@@ -374,8 +262,123 @@ class Trainer:
             np.mean(dice_scores) if dice_scores else 0.0
         )
 
-    def _save_model(
-        self,
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def get_datasets(
+        val_split,
+        root_dir: Path,
+        max_total_samples: int,
+    ) -> Tuple[torch.utils.data.Subset, torch.utils.data.Subset]:
+        """
+        Build the full training dataset, optionally subsample, then split into train/val.
+
+        Args:
+            root_dir: The root directory of the dataset.
+            total_samples: The total number of samples to use (-1 for all).
+
+        Returns:
+            Tuple containing the training and validation datasets.
+        """
+        full_dataset = BrainTumorDataset(
+            root_dir=str(root_dir),
+            split="train",
+            modalities=["FLAIR", "T1w", "t1gd", "T2w"],
+            transform=train_transforms,
+            target_transform=train_transforms,
+            cache_data=False,
+        )
+
+        final_dataset: Union[BrainTumorDataset, torch.utils.data.Subset[Any]]
+
+        if max_total_samples > 0 and max_total_samples < len(full_dataset):
+            final_dataset = torch.utils.data.Subset(
+                full_dataset, range(max_total_samples)
+            )
+            total_samples = max_total_samples
+        else:
+            final_dataset = full_dataset
+            total_samples = final_dataset.__sizeof__()
+
+        print(f"Total samples in dataset: {total_samples}")
+        val_size = int(val_split * total_samples)
+        val_size = max(1, val_size) if total_samples > 1 else 0
+        train_size = total_samples - val_size
+
+        train_dataset = torch.utils.data.Subset(final_dataset, range(train_size))
+
+        if val_size <= 0:
+            print(
+                "No validation samples available, using the same as for the training."
+            )  # It is strictly for overfitting check on 1 sample
+            val_dataset = train_dataset
+        else:
+            val_dataset = torch.utils.data.Subset(
+                final_dataset, range(train_size, max_total_samples)
+            )
+
+        print(
+            f"Training samples: {len(train_dataset)}, Validation samples: {len(val_dataset)}"
+        )
+        return train_dataset, val_dataset
+
+def create_dataloaders(
+        data_config,
+        train_dataset: torch.utils.data.Subset,
+        val_dataset: torch.utils.data.Subset,
+    ) -> Tuple[DataLoader, DataLoader]:
+        """Create data loaders for training and validation datasets to use during training."""
+        train_loader = DataLoader(
+            train_dataset,
+            batch_size=data_config["batch_size"],
+            shuffle=True,
+            num_workers=data_config["num_workers"],
+            persistent_workers=True,
+            pin_memory=data_config["pin_memory"],
+        )  # We are shuffling the training data for better generalization
+
+        val_loader = DataLoader(
+            val_dataset,
+            batch_size=data_config["batch_size"],
+            shuffle=False,
+            num_workers=data_config["num_workers"],
+            persistent_workers=True,
+            pin_memory=data_config["pin_memory"],
+        )
+
+        # The num_workers and pin_memory arguments are used to speed up data loading,
+        # persistent_workers is used to avoid reinitializing those workers each epoch
+
+        return train_loader, val_loader
+
+def save_model(
         save_dir: Path,
         epoch: int,
         model_state_dict: dict[str, Any],
@@ -399,12 +402,38 @@ class Trainer:
             filepath,
         )
 
-    def _prepare_images_and_masks(self, images, masks, device):
+def ensure_class_indices(
+        target: torch.Tensor, num_classes: int
+    ) -> torch.Tensor:
+        """
+        Ensure target is class indices tensor of shape (B, 1, D, H, W), dtype long.
+        Accepts:
+          - (B, 1, D, H, W) with ints
+          - (B, C, D, H, W) one-hot (will be argmaxed)
+          - (B, D, H, W) (will add channel dim)
+        """
+        # We want to keep the shape consistent here, (B, D, H, W), later ensure the values are of dtype long
+        # and finally add channel dim to return tensor with shape (B, 1, D, H, W)
+        if target.ndim == 5 and target.shape[1] == 1:
+            tgt = target.squeeze(1)
+        elif target.ndim == 5 and target.shape[1] == num_classes:
+            tgt = torch.argmax(target, dim=1)
+        elif target.ndim == 4:
+            tgt = target
+        else:
+            raise ValueError(f"Unexpected target shape: {tuple(target.shape)}")
+
+        if tgt.dtype != torch.long:
+            tgt = tgt.long()
+
+        return tgt.unsqueeze(1)
+
+def prepare_images_and_masks(images, masks, device):
         images, masks = cut_images_and_masks(images, masks)
         images = images.to(device, non_blocking=True)
         masks = masks.to(device, non_blocking=True)
 
-        masks = self._ensure_class_indices(
+        masks = ensure_class_indices(
             masks,
             num_classes=images.shape[1],
         )
