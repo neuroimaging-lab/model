@@ -85,33 +85,10 @@ class Trainer:
 
             # val_loss, val_dice = self._validate(val_loader, device)
             # print(f"Val Loss: {val_loss:.4f}, Val   Dice: {val_dice:.4f}")
+            val_loss, val_dice = -69, -69  # Temporarily disable validation to speed up training
 
-            # self.metric_saver.save(epoch, train_dice, val_dice)
-            self.metric_saver.save(epoch, train_dice, -420.69)
-
-            print("ELLLO")
-            """
-            if checkpoints_enabled:
-                save_model(
-                    save_dir=save_dir,
-                    epoch=epoch,
-                    model_state_dict=self.model.state_dict(),
-                    optimizer_state_dict=self.optimizer.state_dict(),
-                    val_dice=val_dice,
-                )
-
-            if val_dice > best_val_dice:
-                best_val_dice = val_dice
-                save_model(
-                    save_dir=save_dir,
-                    epoch=epoch,
-                    model_state_dict=self.model.state_dict(),
-                    optimizer_state_dict=self.optimizer.state_dict(),
-                    val_dice=val_dice,
-                    is_best_model=True,
-                )
-                print(f"Saved best model with Dice score: {val_dice:.4f}")
-            """
+            self.metric_saver.save(epoch, train_dice, val_dice)
+            #self._checkpoints_and_validation(checkpoints_enabled, save_dir, epoch, val_dice, best_val_dice)
 
         self.graph_maker.make_summary_of_slices(epochs)
         train_time = time.time() - start
@@ -205,12 +182,6 @@ class Trainer:
 
                 self.optimizer.zero_grad(set_to_none=True)
                 outputs = self.model(images)
-
-                if i == 0:
-                    self.graph_maker.set_prediction_and_ground_truth_slice(
-                        outputs, masks
-                    )
-
                 loss = self._dice_loss(outputs, masks)
                 loss.backward()
                 self.optimizer.step()
@@ -219,6 +190,11 @@ class Trainer:
                     dice = self._dice_coefficient(outputs, masks)
                     dice_scores.append(dice.item())
                     epoch_loss += loss.item()
+
+                if i == 0:
+                    self.graph_maker.set_prediction_and_ground_truth_slice(
+                        outputs, masks
+                    )
 
                 progress.set_postfix(
                     {"loss": f"{loss.item():.4f}", "dice": f"{dice_scores[-1]:.4f}"}
@@ -261,6 +237,28 @@ class Trainer:
         return val_loss / max(1, len(dataloader)), float(
             np.mean(dice_scores) if dice_scores else 0.0
         )
+
+    def _checkpoints_and_validation(self, checkpoints_enabled: bool, save_dir: Path, epoch: int, val_dice: float, best_val_dice: float):
+        if checkpoints_enabled:
+                save_model(
+                    save_dir=save_dir,
+                    epoch=epoch,
+                    model_state_dict=self.model.state_dict(),
+                    optimizer_state_dict=self.optimizer.state_dict(),
+                    val_dice=val_dice,
+                )
+
+        if val_dice > best_val_dice:
+            best_val_dice = val_dice
+            save_model(
+                save_dir=save_dir,
+                epoch=epoch,
+                model_state_dict=self.model.state_dict(),
+                optimizer_state_dict=self.optimizer.state_dict(),
+                val_dice=val_dice,
+                is_best_model=True,
+            )
+            print(f"Saved best model with Dice score: {val_dice:.4f}")
 
     
 
