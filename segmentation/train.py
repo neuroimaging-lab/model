@@ -16,6 +16,7 @@ from segmentation.dataset import BrainTumorDataset
 from segmentation.transforms import train_transforms
 from util.graph_maker import GraphMaker
 from util.metric_saver import MetricSaver
+from util.image_manipulation import cut_images_and_masks
 
 
 class Trainer:
@@ -82,11 +83,15 @@ class Trainer:
             if epoch % 5 == 0:
                 self.graph_maker.save_slice(epoch, train_dice)
 
-            val_loss, val_dice = self._validate(val_loader, device)
-            print(f"Val Loss: {val_loss:.4f}, Val   Dice: {val_dice:.4f}")
+            # val_loss, val_dice = self._validate(val_loader, device)
+            # print(f"Val Loss: {val_loss:.4f}, Val   Dice: {val_dice:.4f}")
 
-            self.metric_saver.save(epoch, train_dice, val_dice)
+            # self.metric_saver.save(epoch, train_dice, val_dice)
+            self.metric_saver.save(epoch, train_dice, -420.69)
+            self.graph_maker.visualize_slice(epoch, train_dice)
 
+            print("ELLLO")
+            """
             if checkpoints_enabled:
                 self._save_model(
                     save_dir=save_dir,
@@ -107,6 +112,7 @@ class Trainer:
                     is_best_model=True,
                 )
                 print(f"Saved best model with Dice score: {val_dice:.4f}")
+            """
 
         self.graph_maker.make_summary_of_slices(epochs)
         train_time = time.time() - start
@@ -394,7 +400,7 @@ class Trainer:
         )
 
     def _prepare_images_and_masks(self, images, masks, device):
-        # images, masks = cut_images_and_masks(images, masks)
+        images, masks = cut_images_and_masks(images, masks)
         images = images.to(device, non_blocking=True)
         masks = masks.to(device, non_blocking=True)
 

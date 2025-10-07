@@ -1,11 +1,14 @@
 import os
+import random
 from typing import Optional
 
 import matplotlib.pyplot as plt
 from PIL import Image
+import numpy as np
 import torch
 
 from segmentation.config import METRICS_DIR
+from matplotlib.colors import ListedColormap
 
 
 class GraphMaker:
@@ -15,8 +18,29 @@ class GraphMaker:
         self.target_slice = None
 
         self.slices_dir_path = f"{METRICS_DIR}slices/"
-
+        self.slice_idx = None
         os.makedirs(self.slices_dir_path)
+
+    def _find_slice_idx_with_all_classes(self, target_labels: torch.Tensor) -> Optional[int]:
+        random.seed(42)
+
+        target_labels = target_labels.squeeze(1)  # [B, D, H, W]
+        num_slices = target_labels.shape[1]  # Number of slices in depth dimension
+
+        # Generate and shuffle indices
+        indices = list(range(num_slices))
+        random.shuffle(indices)
+
+        for desired_class in range(4, 2, -1):
+            for slice_idx in indices:
+                slice_data = target_labels[0, slice_idx, :, :].cpu().detach().numpy()
+                unique_classes = np.unique(slice_data)
+                if len(unique_classes) == desired_class:
+                    return slice_idx
+
+        raise ValueError(
+                 f"Wrong target_labels: No slice contains all classes in {num_slices} slices."
+             )
 
     def set_prediction_and_ground_truth_slice(
         self,
@@ -27,16 +51,20 @@ class GraphMaker:
         pred_labels = torch.argmax(pred_logits, dim=1)  # [B, D, H, W]
         target_labels = target_labels.squeeze(1)  # [B, D, H, W]
 
-        slice_idx = (
-            pred_labels.shape[1] // 2 if slice_idx is None else slice_idx
-        )  # middle one as a default
-        if slice_idx < 0 or slice_idx >= pred_labels.shape[1]:
-            raise ValueError(
-                f"Slice_idx {slice_idx} is out of bounds for depth dimension {pred_labels.shape[1]}"
-            )
+        # slice_idx = (
+        #     #pred_labels.shape[1] // 2 if slice_idx is None else slice_idx
+        #     pred_labels.shape[1] - 1 if slice_idx is None else slice_idx
+        # )  # middle one as a default
+        # if slice_idx < 0 or slice_idx >= pred_labels.shape[1]:
+        #     raise ValueError(
+        #         f"Slice_idx {slice_idx} is out of bounds for depth dimension {pred_labels.shape[1]}"
+        #     )
+        if slice_idx is None:
+            self.slice_idx = self._find_slice_idx_with_all_classes(target_labels) if slice_idx is None else slice_idx
+            print(f"\nChosen slice index {self.slice_idx}")
 
-        self.pred_slice = pred_labels[0, slice_idx, :, :].cpu().detach().numpy()
-        self.target_slice = target_labels[0, slice_idx, :, :].cpu().detach().numpy()
+        self.pred_slice = pred_labels[0, self.slice_idx, :, :].cpu().detach().numpy()
+        self.target_slice = target_labels[0, self.slice_idx, :, :].cpu().detach().numpy()
 
     def visualize_slice(self, epoch: int, dice_score: float):
         self._create_slice_figure(epoch, dice_score)
@@ -49,17 +77,27 @@ class GraphMaker:
         plt.close(fig)
 
     def _create_slice_figure(self, epoch: int, dice_score: float):
+
+        colors = ["darkviolet", "blue", "green", "yellow"] 
+        labels = ["Background", "Brain", "Tissue", "Cancer"]
+        ticks = [0, 1, 2, 3]
+        cmap = ListedColormap(colors)
+
         fig, axes = plt.subplots(1, 2, figsize=(12, 6))
         title = f"Epoch {epoch} — Dice Score: {dice_score:.4f}"
         fig.suptitle(title, fontsize=16)
 
+        # Prediction slice
         axes[0].set_title("Prediction")
-        im0 = axes[0].imshow(self.pred_slice, cmap="viridis")
-        fig.colorbar(im0, ax=axes[0])
+        im0 = axes[0].imshow(self.pred_slice, cmap=cmap, vmin=0, vmax=3)
+        cbar0 = fig.colorbar(im0, ax=axes[0], ticks=ticks)
+        cbar0.ax.set_yticklabels(labels)
 
+        # Ground truth slice
         axes[1].set_title("Ground Truth")
-        im1 = axes[1].imshow(self.target_slice, cmap="viridis")
-        fig.colorbar(im1, ax=axes[1])
+        im1 = axes[1].imshow(self.target_slice, cmap=cmap, vmin=0, vmax=3)
+        cbar1 = fig.colorbar(im1, ax=axes[1], ticks=ticks)
+        cbar1.ax.set_yticklabels(labels)
 
         fig.tight_layout()
         return fig
