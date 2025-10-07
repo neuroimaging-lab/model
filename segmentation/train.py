@@ -95,6 +95,41 @@ class Trainer:
         train_time = int(train_time)
         print(f"Training completed in {timedelta(seconds=train_time)}")
 
+    def focal_loss(
+        self,
+        logits: torch.Tensor,  # (B, C, D, H, W)
+        target: torch.Tensor,  # (B, 1, D, H, W) containing class indices (dtype long)
+        alpha: float = 0.25,   # Balancing factor for positive/negative classes
+        gamma: float = 2.0,    # Focusing parameter
+        eps: float = 1e-6,     # Small value to avoid division by zero
+    ) -> torch.Tensor:
+        """
+        Multi-class Focal Loss for imbalanced datasets.
+        Args:
+            logits: Raw model outputs (logits) of shape (B, C, D, H, W).
+            target: Ground truth tensor of shape (B, 1, D, H, W) containing class indices.
+            alpha: Balancing factor for positive/negative classes.
+            gamma: Focusing parameter to reduce loss contribution from easy examples.
+            eps: Small value to avoid division by zero.
+        Returns:
+            Focal loss value as a single scalar tensor.
+        """
+        # Normalize logits to probabilities using softmax
+        probs = F.softmax(logits, dim=1)  # (B, C, D, H, W)
+        c = probs.shape[1]
+
+        # Convert target to one-hot encoding
+        tgt = target.squeeze(1).long()  # (B, D, H, W)
+        one_hot = F.one_hot(tgt, num_classes=c).permute(0, 4, 1, 2, 3).float()  # (B, C, D, H, W)
+
+        # Compute the focal loss
+        pt = (probs * one_hot).sum(dim=1)  # Probability of the true class (B, D, H, W)
+        log_pt = torch.log(pt + eps)       # Log probability of the true class
+        focal_term = (1 - pt) ** gamma     # Focusing term to emphasize hard examples
+
+        loss = -alpha * focal_term * log_pt  # Focal loss formula
+        return loss.mean()
+
     
     def _dice_loss(
         self,
@@ -182,7 +217,8 @@ class Trainer:
 
                 self.optimizer.zero_grad(set_to_none=True)
                 outputs = self.model(images)
-                loss = self._dice_loss(outputs, masks)
+                #loss = self._dice_loss(outputs, masks)
+                loss = self.focal_loss(outputs, masks)
                 loss.backward()
                 self.optimizer.step()
 
