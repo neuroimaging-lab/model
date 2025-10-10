@@ -12,8 +12,6 @@ class MetricSaver:
             f.write(self.header_name)
 
     def save(self, epoch: int, train_dice: float, val_dice: float):
-        entry = (
-            f"{epoch:03d},{train_dice:.4f},{val_dice:.4f}\n"
-        )
+        entry = f"{epoch:03d},{train_dice:.4f},{val_dice:.4f}\n"
         with open(self.file_path, mode="a", encoding="utf-8") as f:
             f.write(entry)

@@ -12,9 +12,15 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from segmentation.config import CURR_RUN
+from segmentation.train_utils import (
+    create_dataloaders,
+    get_datasets,
+    prepare_images_and_masks,
+    save_model,
+)
 from util.graph_maker import GraphMaker
 from util.metric_saver import MetricSaver
-from segmentation.train_utils import get_datasets, create_dataloaders, prepare_images_and_masks, save_model
+
 
 class Trainer:
     """
@@ -57,8 +63,12 @@ class Trainer:
         device: str = "cpu",
         checkpoints_enabled: bool = False,
     ) -> None:
-        train_dataset, val_dataset = get_datasets(self.data_config["val_split"], dataset_dir, total_samples)
-        train_loader, val_loader = create_dataloaders(self.data_config, train_dataset, val_dataset)
+        train_dataset, val_dataset = get_datasets(
+            self.data_config["val_split"], dataset_dir, total_samples
+        )
+        train_loader, val_loader = create_dataloaders(
+            self.data_config, train_dataset, val_dataset
+        )
 
         self.model = self.model.to(device)
 
@@ -82,10 +92,13 @@ class Trainer:
 
             # val_loss, val_dice = self._validate(val_loader, device)
             # print(f"Val Loss: {val_loss:.4f}, Val   Dice: {val_dice:.4f}")
-            val_loss, val_dice = 0, 0  # Temporarily disable validation to speed up training
+            val_loss, val_dice = (
+                0,
+                0,
+            )  # Temporarily disable validation to speed up training
 
             self.metric_saver.save(epoch, train_dice, val_dice)
-            #self._checkpoints_and_validation(checkpoints_enabled, save_dir, epoch, val_dice, best_val_dice)
+            # self._checkpoints_and_validation(checkpoints_enabled, save_dir, epoch, val_dice, best_val_dice)
 
         self.graph_maker.make_summary_of_results(epochs)
         train_time = time.time() - start
@@ -96,16 +109,21 @@ class Trainer:
         self,
         logits: torch.Tensor,  # (B, C, D, H, W)
         target: torch.Tensor,  # (B, 1, D, H, W) containing class indices (dtype long)
-        alpha: list = [0.0042, 0.0235, 0.8686, 0.1037],  # Default per-class weights (BG, Edema, Non-enh, Enh)
-        gamma: float = 1.0,    # Focusing parameter
-        eps: float = 1e-6,     # Small value to avoid division by zero
+        alpha: list = [
+            0.0042,
+            0.0235,
+            0.8686,
+            0.1037,
+        ],  # Default per-class weights (BG, Edema, Non-enh, Enh)
+        gamma: float = 1.0,  # Focusing parameter
+        eps: float = 1e-6,  # Small value to avoid division by zero
     ) -> torch.Tensor:
         """
         Multi-class Focal Loss for imbalanced datasets.
         Args:
             logits: Raw model outputs (logits) of shape (B, C, D, H, W).
             target: Ground truth tensor of shape (B, 1, D, H, W) containing class indices.
-            alpha: Balancing factor 
+            alpha: Balancing factor
             gamma: Focusing parameter to reduce loss contribution from easy examples.
             eps: Small value to avoid division by zero.
         Returns:
@@ -117,12 +135,14 @@ class Trainer:
 
         # Convert target to one-hot encoding
         tgt = target.squeeze(1).long()  # (B, D, H, W)
-        one_hot = F.one_hot(tgt, num_classes=c).permute(0, 4, 1, 2, 3).float()  # (B, C, D, H, W)
+        one_hot = (
+            F.one_hot(tgt, num_classes=c).permute(0, 4, 1, 2, 3).float()
+        )  # (B, C, D, H, W)
 
         # Compute the focal loss
         pt = (probs * one_hot).sum(dim=1)  # Probability of the true class (B, D, H, W)
-        log_pt = torch.log(pt + eps)       # Log probability of the true class
-        focal_term = (1 - pt) ** gamma     # Focusing term to emphasize hard examples
+        log_pt = torch.log(pt + eps)  # Log probability of the true class
+        focal_term = (1 - pt) ** gamma  # Focusing term to emphasize hard examples
 
         alpha_t = torch.tensor(alpha, dtype=logits.dtype, device=logits.device)
         alpha_t = alpha_t[tgt]
@@ -130,7 +150,6 @@ class Trainer:
         loss = -alpha_t * focal_term * log_pt  # Focal loss formula
         return loss.mean()
 
-    
     def _dice_loss(
         self,
         logits: torch.Tensor,  # (B, C, D, H, W)
@@ -217,7 +236,7 @@ class Trainer:
 
                 self.optimizer.zero_grad(set_to_none=True)
                 outputs = self.model(images)
-                #loss = self._dice_loss(outputs, masks)
+                # loss = self._dice_loss(outputs, masks)
                 loss = self.focal_loss(outputs, masks)
                 loss.backward()
                 self.optimizer.step()
@@ -252,9 +271,7 @@ class Trainer:
         with torch.no_grad():
             with tqdm(dataloader, desc="Validation") as progress:
                 for _, (images, masks) in enumerate(progress):
-                    images, masks = prepare_images_and_masks(
-                        images, masks, device
-                    )
+                    images, masks = prepare_images_and_masks(images, masks, device)
 
                     outputs = self.model(images)
                     loss = self._dice_loss(outputs, masks)
@@ -274,15 +291,22 @@ class Trainer:
             np.mean(dice_scores) if dice_scores else 0.0
         )
 
-    def _checkpoints_and_validation(self, checkpoints_enabled: bool, save_dir: Path, epoch: int, val_dice: float, best_val_dice: float):
+    def _checkpoints_and_validation(
+        self,
+        checkpoints_enabled: bool,
+        save_dir: Path,
+        epoch: int,
+        val_dice: float,
+        best_val_dice: float,
+    ):
         if checkpoints_enabled:
-                save_model(
-                    save_dir=save_dir,
-                    epoch=epoch,
-                    model_state_dict=self.model.state_dict(),
-                    optimizer_state_dict=self.optimizer.state_dict(),
-                    val_dice=val_dice,
-                )
+            save_model(
+                save_dir=save_dir,
+                epoch=epoch,
+                model_state_dict=self.model.state_dict(),
+                optimizer_state_dict=self.optimizer.state_dict(),
+                val_dice=val_dice,
+            )
 
         if val_dice > best_val_dice:
             best_val_dice = val_dice
@@ -295,36 +319,3 @@ class Trainer:
                 is_best_model=True,
             )
             print(f"Saved best model with Dice score: {val_dice:.4f}")
-            
-
-    
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
