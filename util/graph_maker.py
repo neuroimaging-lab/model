@@ -103,23 +103,28 @@ class GraphMaker:
         fig.tight_layout()
         return fig
 
-    def make_summary_of_slices(
+    def make_summary_of_results(
         self,
         epochs: int,
-        step: int = 20,
-        grid_cols: int = 2,
-        output_file: str = "summary.png",
+        slice_file: str = "summary.png",
+        dice_plot_file: str = "dice_plot.png",
     ):
-        slice_indices = list(range(0, epochs + 1, step))
+        plot = self.make_dice_summary_plot()
+        plot.savefig(os.path.join(METRICS_DIR, dice_plot_file))
+
+        summary_img = self._prepare_slice_summary_image(epochs)
+        summary_img.save(os.path.join(METRICS_DIR, slice_file))
+        
+    
+    def _prepare_slice_summary_image(self, epochs, step:int = 20, grid_cols:int = 2):
         image_paths = [
-            os.path.join(self.slices_dir_path, f"slice_{i}.png") for i in slice_indices
+            os.path.join(self.slices_dir_path, f"slice_{i}.png") for i in range(0, epochs + 1, step)
         ]
 
         images = [Image.open(path) for path in image_paths if os.path.exists(path)]
 
         if not images:
-            print("No images to combine.")
-            return
+            raise ValueError("Could not prepare summary image. No images found for the specified epochs.")
 
         img_width, img_height = images[0].size
         grid_rows = (len(images) + grid_cols - 1) // grid_cols
@@ -133,5 +138,54 @@ class GraphMaker:
             x = col * img_width
             y = row * img_height
             summary_img.paste(img, (x, y))
+        
+        return summary_img
+    
+    def make_dice_summary_plot(self):
+        metrics_path = METRICS_DIR + "metrics.csv"
+        data = np.genfromtxt(metrics_path, delimiter=",", skip_header=1)
 
-        summary_img.save(os.path.join(METRICS_DIR, output_file))
+        epochs = data[:, 0]
+        train_dice = data[:, 1]
+        val_dice = data[:, 2]
+
+        fig, ax = plt.subplots(figsize=(8, 6))
+        ax.plot(epochs, train_dice, label="Train Dice", color="blue", linewidth=2, marker="o")
+        ax.plot(epochs, val_dice, label="Validation Dice", color="orange", linewidth=2, marker="s")
+
+        ax.set_title("Dice Score Over Epochs", fontsize=14, fontweight="bold")
+        ax.set_xlabel("Epoch", fontsize=12)
+        ax.set_ylabel("Dice Score", fontsize=12)
+        ax.set_ylim(0, 1)
+
+        min_epoch, max_epoch, step = self.get_epochs_info(epochs)
+        ax.set_xlim(min_epoch, max_epoch + 0.5)
+        ax.set_xticks(np.arange(min_epoch, max_epoch + 1, step))
+        ax.tick_params(axis="x", rotation=45)
+
+        ax.grid(True, linestyle="--", alpha=0.6)
+        ax.legend(fontsize=10, loc="lower right")
+
+        plt.tight_layout()
+
+        return fig
+    
+    def get_epochs_info(self, epochs):
+        min_epoch = int(np.min(epochs))
+        max_epoch = int(np.max(epochs))
+        num_epochs = max_epoch - min_epoch + 1
+        if num_epochs <= 20:
+            step = 1
+        elif num_epochs <= 50:
+            step = 2
+        elif num_epochs <= 100:
+            step = 5
+        elif num_epochs <= 200:
+            step = 10
+        elif num_epochs <= 500:
+            step = 20
+        else:
+            step = 50
+        
+        return min_epoch, max_epoch, step
+

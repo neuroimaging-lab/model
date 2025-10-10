@@ -82,12 +82,12 @@ class Trainer:
 
             # val_loss, val_dice = self._validate(val_loader, device)
             # print(f"Val Loss: {val_loss:.4f}, Val   Dice: {val_dice:.4f}")
-            val_loss, val_dice = -69, -69  # Temporarily disable validation to speed up training
+            val_loss, val_dice = 0, 0  # Temporarily disable validation to speed up training
 
             self.metric_saver.save(epoch, train_dice, val_dice)
             #self._checkpoints_and_validation(checkpoints_enabled, save_dir, epoch, val_dice, best_val_dice)
 
-        self.graph_maker.make_summary_of_slices(epochs)
+        self.graph_maker.make_summary_of_results(epochs)
         train_time = time.time() - start
         train_time = int(train_time)
         print(f"Training completed in {timedelta(seconds=train_time)}")
