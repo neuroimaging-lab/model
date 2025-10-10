@@ -7,13 +7,11 @@ from PIL import Image
 import numpy as np
 import torch
 
-from segmentation.config import METRICS_DIR
+from segmentation.config import DATA_LABELS, METRICS_DIR
 from matplotlib.colors import ListedColormap
 
 
 class GraphMaker:
-    labels = ["Background", "Edema", "Non-enhancing tumor", "Enhancing tumour"]
-
     def __init__(self):
         self.fig = None
         self.pred_slice = None
@@ -21,7 +19,6 @@ class GraphMaker:
 
         self.slices_dir_path = f"{METRICS_DIR}slices/"
         self.slice_idx = None
-        self.calculated_propability = None
         os.makedirs(self.slices_dir_path)
 
     def _find_slice_idx_with_all_classes(self, target_labels: torch.Tensor) -> Optional[int]:
@@ -69,9 +66,6 @@ class GraphMaker:
         self.pred_slice = pred_labels[0, self.slice_idx, :, :].cpu().detach().numpy()
         self.target_slice = target_labels[0, self.slice_idx, :, :].cpu().detach().numpy()
 
-        if self.calculated_propability is None:
-            self.calculated_propability = self._calculate_propability_of_each_class(self.target_slice)
-
     def visualize_slice(self, epoch: int, dice_score: float):
         self._create_slice_figure(epoch, dice_score)
         plt.show()
@@ -98,13 +92,13 @@ class GraphMaker:
         axes[0].set_title("Prediction")
         im0 = axes[0].imshow(self.pred_slice, cmap=cmap, vmin=0, vmax=3)
         cbar0 = fig.colorbar(im0, ax=axes[0], ticks=ticks)
-        cbar0.ax.set_yticklabels(self.labels)
+        cbar0.ax.set_yticklabels(DATA_LABELS)
 
         # Ground truth slice
         axes[1].set_title("Ground Truth")
         im1 = axes[1].imshow(self.target_slice, cmap=cmap, vmin=0, vmax=3)
         cbar1 = fig.colorbar(im1, ax=axes[1], ticks=ticks)
-        cbar1.ax.set_yticklabels(self.labels)
+        cbar1.ax.set_yticklabels(DATA_LABELS)
 
         fig.tight_layout()
         return fig
@@ -141,15 +135,3 @@ class GraphMaker:
             summary_img.paste(img, (x, y))
 
         summary_img.save(os.path.join(METRICS_DIR, output_file))
-    
-    def _calculate_propability_of_each_class(self, target_slice):
-        unique_classes, counts = np.unique(target_slice, return_counts=True)
-
-        total_voxels = self.target_slice.size
-        proportions = {self.labels[int(cls)]: count / total_voxels for cls, count in zip(unique_classes, counts)}
-
-        for label, proportion in proportions.items():
-            print(f"Class '{label}': {proportion:.4f}")
-
-        return proportions
-
