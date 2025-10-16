@@ -14,10 +14,10 @@ from tqdm import tqdm
 from segmentation.config import CURR_RUN
 from segmentation.train_utils import (
     create_dataloaders,
-    get_datasets,
     prepare_images_and_masks,
     save_model,
 )
+from util.class_distribution_analyzer import ClassDistributionAnalyzer
 from util.graph_maker import GraphMaker
 from util.metric_saver import MetricSaver
 
@@ -39,7 +39,7 @@ class Trainer:
         num_workers: int = 2,
         pin_memory: bool = True,
         include_bg: bool = False,  # Background (usually dominant) can negatively impact Dice score
-    ) -> None:
+    ):
         self.model = model
         self.optimizer = optimizer
 
@@ -54,6 +54,7 @@ class Trainer:
         self.include_bg = include_bg
         self.graph_maker = GraphMaker()
         self.metric_saver = MetricSaver()
+        self.best_val_dice: float = 0.0
 
     def train(
         self,
@@ -62,25 +63,23 @@ class Trainer:
         epochs: int = 5,
         device: str = "cpu",
         checkpoints_enabled: bool = False,
-    ) -> None:
-        train_dataset, val_dataset = get_datasets(
-            self.data_config["val_split"], dataset_dir, total_samples
-        )
+    ):
         train_loader, val_loader = create_dataloaders(
-            self.data_config, train_dataset, val_dataset
+            self.data_config, dataset_dir, total_samples
         )
-
-        self.model = self.model.to(device)
-
-        best_val_dice: float = 0.0
 
         save_dir: Path = self.data_config["save_dir"] / CURR_RUN
         save_dir.mkdir(exist_ok=True, parents=True)
 
+        ClassDistributionAnalyzer(
+            train_loader, val_loader
+        ).print_probability_of_each_class()
+
+        self.best_val_dice = 0.0
+        self.model = self.model.to(device)
+
         print(f"Training on device: {device}")
-
         start = time.time()
-
         for epoch in range(epochs + 1):
             print(f"\nEpoch {epoch}/{epochs}")
 
@@ -101,11 +100,10 @@ class Trainer:
             # self._checkpoints_and_validation(checkpoints_enabled, save_dir, epoch, val_dice, best_val_dice)
 
         self.graph_maker.make_summary_of_results(epochs)
-        train_time = time.time() - start
-        train_time = int(train_time)
+        train_time = int(time.time() - start)
         print(f"Training completed in {timedelta(seconds=train_time)}")
 
-    def focal_loss(
+    def _focal_loss(
         self,
         logits: torch.Tensor,  # (B, C, D, H, W)
         target: torch.Tensor,  # (B, 1, D, H, W) containing class indices (dtype long)
@@ -237,7 +235,7 @@ class Trainer:
                 self.optimizer.zero_grad(set_to_none=True)
                 outputs = self.model(images)
                 # loss = self._dice_loss(outputs, masks)
-                loss = self.focal_loss(outputs, masks)
+                loss = self._focal_loss(outputs, masks)
                 loss.backward()
                 self.optimizer.step()
 
@@ -297,7 +295,6 @@ class Trainer:
         save_dir: Path,
         epoch: int,
         val_dice: float,
-        best_val_dice: float,
     ):
         if checkpoints_enabled:
             save_model(
@@ -308,8 +305,8 @@ class Trainer:
                 val_dice=val_dice,
             )
 
-        if val_dice > best_val_dice:
-            best_val_dice = val_dice
+        if val_dice > self.best_val_dice:
+            self.best_val_dice = val_dice
             save_model(
                 save_dir=save_dir,
                 epoch=epoch,

@@ -1,11 +1,9 @@
 from pathlib import Path
 from typing import Any, Tuple, Union
 
-import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
-from segmentation.config import DATA_LABELS
 from segmentation.dataset import BrainTumorDataset
 from segmentation.transforms import train_transforms
 from util.image_manipulation import cut_images_and_masks
@@ -68,11 +66,14 @@ def get_datasets(
 
 
 def create_dataloaders(
-    data_config,
-    train_dataset: torch.utils.data.Subset,
-    val_dataset: torch.utils.data.Subset,
+    data_config, root_dir: Path, max_total_samples: int
 ) -> Tuple[DataLoader, DataLoader]:
     """Create data loaders for training and validation datasets to use during training."""
+
+    train_dataset, val_dataset = get_datasets(
+        data_config["val_split"], root_dir, max_total_samples
+    )
+
     train_loader = DataLoader(
         train_dataset,
         batch_size=data_config["batch_size"],
@@ -148,11 +149,7 @@ def ensure_class_indices(target: torch.Tensor, num_classes: int) -> torch.Tensor
 
 
 def prepare_images_and_masks(images, masks, device):
-    global ONCE
     images, masks = cut_images_and_masks(images, masks)
-
-    if not ONCE:
-        print_probability_of_each_class(masks[0])
 
     images = images.to(device, non_blocking=True)
     masks = masks.to(device, non_blocking=True)
@@ -163,24 +160,3 @@ def prepare_images_and_masks(images, masks, device):
     )
 
     return images, masks
-
-
-ONCE = False
-
-
-def print_probability_of_each_class(example_image_mask: torch.Tensor):
-    mask_np = example_image_mask.squeeze(0).cpu().numpy()
-    unique_classes, counts = np.unique(mask_np, return_counts=True)
-
-    total_voxels = mask_np.size
-    proportions = {
-        DATA_LABELS[int(cls)]: count / total_voxels
-        for cls, count in zip(unique_classes, counts)
-    }
-
-    print("\nClass proportions in the selected MRI image:")
-    for label, proportion in proportions.items():
-        print(f"Class '{label}': {proportion:.7f}")
-
-    global ONCE
-    ONCE = True
