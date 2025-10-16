@@ -15,3 +15,8 @@ class MetricSaver:
         entry = f"{epoch:03d},{train_dice:.4f},{val_dice:.4f}\n"
         with open(self.file_path, mode="a", encoding="utf-8") as f:
             f.write(entry)
+
+    def save_txt_file(self, text: str, filename: str = "class_distribution.txt"):
+        txt_path = os.path.join(METRICS_DIR, filename)
+        with open(txt_path, mode="w", encoding="utf-8") as f:
+            f.write(text)

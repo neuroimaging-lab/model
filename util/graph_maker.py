@@ -53,14 +53,6 @@ class GraphMaker:
         pred_labels = torch.argmax(pred_logits, dim=1)  # [B, D, H, W]
         target_labels = target_labels.squeeze(1)  # [B, D, H, W]
 
-        # slice_idx = (
-        #     #pred_labels.shape[1] // 2 if slice_idx is None else slice_idx
-        #     pred_labels.shape[1] - 1 if slice_idx is None else slice_idx
-        # )  # middle one as a default
-        # if slice_idx < 0 or slice_idx >= pred_labels.shape[1]:
-        #     raise ValueError(
-        #         f"Slice_idx {slice_idx} is out of bounds for depth dimension {pred_labels.shape[1]}"
-        #     )
         if slice_idx is None:
             self.slice_idx = (
                 self._find_slice_idx_with_all_classes(target_labels)
@@ -73,10 +65,6 @@ class GraphMaker:
         self.target_slice = (
             target_labels[0, self.slice_idx, :, :].cpu().detach().numpy()
         )
-
-    def visualize_slice(self, epoch: int, dice_score: float):
-        self._create_slice_figure(epoch, dice_score)
-        plt.show()
 
     def save_slice(self, epoch: int, dice_score: float):
         slice_path = self.slices_dir_path + f"slice_{epoch}.png"
@@ -115,7 +103,7 @@ class GraphMaker:
         slice_file: str = "summary.png",
         dice_plot_file: str = "dice_plot.png",
     ):
-        plot = self.make_dice_summary_plot()
+        plot = self._make_dice_summary_plot()
         plot.savefig(os.path.join(METRICS_DIR, dice_plot_file))
 
         summary_img = self._prepare_slice_summary_image(epochs)
@@ -149,7 +137,7 @@ class GraphMaker:
 
         return summary_img
 
-    def make_dice_summary_plot(self):
+    def _make_dice_summary_plot(self):
         metrics_path = METRICS_DIR + "metrics.csv"
         data = np.genfromtxt(metrics_path, delimiter=",", skip_header=1)
 
@@ -180,7 +168,7 @@ class GraphMaker:
         ax.set_ylabel("Dice Score", fontsize=12)
         ax.set_ylim(0, 1)
 
-        min_epoch, max_epoch, step = self.get_epochs_info(epochs)
+        min_epoch, max_epoch, step = self._get_epochs_info(epochs)
         ax.set_xlim(min_epoch, max_epoch + 0.5)
         ax.set_xticks(np.arange(min_epoch, max_epoch + 1, step))
         ax.tick_params(axis="x", rotation=45)
@@ -192,7 +180,7 @@ class GraphMaker:
 
         return fig
 
-    def get_epochs_info(self, epochs):
+    def _get_epochs_info(self, epochs):
         min_epoch = int(np.min(epochs))
         max_epoch = int(np.max(epochs))
         num_epochs = max_epoch - min_epoch + 1

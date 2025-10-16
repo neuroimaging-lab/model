@@ -4,6 +4,7 @@ from typing import Any, Tuple, Union
 import torch
 from torch.utils.data import DataLoader
 
+from segmentation.config import SUPER_COMPUTER_ENABLED
 from segmentation.dataset import BrainTumorDataset
 from segmentation.transforms import train_transforms
 from util.image_manipulation import cut_images_and_masks
@@ -149,7 +150,8 @@ def ensure_class_indices(target: torch.Tensor, num_classes: int) -> torch.Tensor
 
 
 def prepare_images_and_masks(images, masks, device):
-    images, masks = cut_images_and_masks(images, masks)
+    if not SUPER_COMPUTER_ENABLED:
+        images, masks = cut_images_and_masks(images, masks)
 
     images = images.to(device, non_blocking=True)
     masks = masks.to(device, non_blocking=True)

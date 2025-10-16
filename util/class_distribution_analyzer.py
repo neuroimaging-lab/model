@@ -51,3 +51,9 @@ class ClassDistributionAnalyzer:
                     )
 
         return summ_dict, iterations
+
+    def get_class_distribution_text(self) -> str:
+        text = ""
+        for label, proportion in self.proportions.items():
+            text += f"'{label}': {proportion:.7f}\n"
+        return text

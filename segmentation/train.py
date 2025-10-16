@@ -11,7 +11,8 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from segmentation.config import CURR_RUN
+from segmentation.config import CURR_RUN, SAVE_BEST_MODEL, SUPER_COMPUTER_ENABLED
+from segmentation.focal_param_strategy import FocalParamStrategy
 from segmentation.train_utils import (
     create_dataloaders,
     prepare_images_and_masks,
@@ -55,6 +56,8 @@ class Trainer:
         self.graph_maker = GraphMaker()
         self.metric_saver = MetricSaver()
         self.best_val_dice: float = 0.0
+        self.focal_param_strategy: FocalParamStrategy
+        self.save_dir: Path
 
     def train(
         self,
@@ -68,15 +71,9 @@ class Trainer:
             self.data_config, dataset_dir, total_samples
         )
 
-        save_dir: Path = self.data_config["save_dir"] / CURR_RUN
-        save_dir.mkdir(exist_ok=True, parents=True)
-
-        ClassDistributionAnalyzer(
-            train_loader, val_loader
-        ).print_probability_of_each_class()
-
-        self.best_val_dice = 0.0
-        self.model = self.model.to(device)
+        self._pre_training_preparation(
+            train_loader, val_loader, checkpoints_enabled, device
+        )
 
         print(f"Training on device: {device}")
         start = time.time()
@@ -89,32 +86,46 @@ class Trainer:
             if epoch % 5 == 0:
                 self.graph_maker.save_slice(epoch, train_dice)
 
-            # val_loss, val_dice = self._validate(val_loader, device)
-            # print(f"Val Loss: {val_loss:.4f}, Val   Dice: {val_dice:.4f}")
-            val_loss, val_dice = (
-                0,
-                0,
-            )  # Temporarily disable validation to speed up training
+            val_loss, val_dice = self._validate(val_loader, device)
+            print(f"Val Loss: {val_loss:.4f}, Val Dice: {val_dice:.4f}")
 
             self.metric_saver.save(epoch, train_dice, val_dice)
-            # self._checkpoints_and_validation(checkpoints_enabled, save_dir, epoch, val_dice, best_val_dice)
+            self._checkpoints_and_validation(checkpoints_enabled, epoch, val_dice)
 
         self.graph_maker.make_summary_of_results(epochs)
         train_time = int(time.time() - start)
         print(f"Training completed in {timedelta(seconds=train_time)}")
 
+    def _pre_training_preparation(
+        self,
+        train_loader: DataLoader,
+        val_loader: DataLoader,
+        checkpoints_enabled: bool,
+        device: str,
+    ):
+        class_distribution = ClassDistributionAnalyzer(train_loader, val_loader)
+        class_distribution.print_probability_of_each_class()
+        self.metric_saver.save_txt_file(
+            class_distribution.get_class_distribution_text(),
+            filename="class_distribution.txt",
+        )
+
+        self.focal_param_strategy = FocalParamStrategy(
+            class_distribution.proportions, self.metric_saver
+        )
+
+        if SUPER_COMPUTER_ENABLED or SAVE_BEST_MODEL or checkpoints_enabled:
+            self.save_dir: Path = self.data_config["save_dir"] / CURR_RUN
+            self.save_dir.mkdir(exist_ok=True, parents=True)
+
+        self.best_val_dice = 0.0
+        self.model = self.model.to(device)
+
     def _focal_loss(
         self,
         logits: torch.Tensor,  # (B, C, D, H, W)
         target: torch.Tensor,  # (B, 1, D, H, W) containing class indices (dtype long)
-        alpha: list = [
-            0.0042,
-            0.0235,
-            0.8686,
-            0.1037,
-        ],  # Default per-class weights (BG, Edema, Non-enh, Enh)
-        gamma: float = 1.0,  # Focusing parameter
-        eps: float = 1e-6,  # Small value to avoid division by zero
+        params: FocalParamStrategy,  # contains alpha, gamma and epsilon
     ) -> torch.Tensor:
         """
         Multi-class Focal Loss for imbalanced datasets.
@@ -139,56 +150,16 @@ class Trainer:
 
         # Compute the focal loss
         pt = (probs * one_hot).sum(dim=1)  # Probability of the true class (B, D, H, W)
-        log_pt = torch.log(pt + eps)  # Log probability of the true class
-        focal_term = (1 - pt) ** gamma  # Focusing term to emphasize hard examples
+        log_pt = torch.log(pt + params.eps)  # Log probability of the true class
+        focal_term = (
+            1 - pt
+        ) ** params.gamma  # Focusing term to emphasize hard examples
 
-        alpha_t = torch.tensor(alpha, dtype=logits.dtype, device=logits.device)
+        alpha_t = torch.tensor(params.alpha, dtype=logits.dtype, device=logits.device)
         alpha_t = alpha_t[tgt]
 
         loss = -alpha_t * focal_term * log_pt  # Focal loss formula
         return loss.mean()
-
-    def _dice_loss(
-        self,
-        logits: torch.Tensor,  # (B, C, D, H, W)
-        target: torch.Tensor,  # (B, 1, D, H, W) containing class indices (dtype long)
-        eps: float = 1e-6,
-    ) -> torch.Tensor:
-        """Multi-class soft Dice loss (probabilities vs one-hot target)."""
-        # This normalizes the logits (which are raw, unnormalized scores the model outputs)
-        # across classes, so that they sum to 1 across classes
-        probs = F.softmax(logits, dim=1)  # (B, C, D, H, W)
-        c = probs.shape[1]
-
-        tgt = target.squeeze(1).long()  # (B, D, H, W)
-        # Now we create vector instead of class index at each voxel, so if we had 4 classes, and at voxel (d, h, w) the class is 2,
-        # the vector will be [0, 1, 0, 0], later we reorganize tensor shape to match (B, C, D, H, W)
-        one_hot = F.one_hot(tgt, num_classes=c).permute(0, 4, 1, 2, 3).float()
-
-        if not self.include_bg and c > 1:
-            # If we do not include background, we remove the first channel (background has index 0) with slicing
-            probs = probs[:, 1:, ...]
-            one_hot = one_hot[:, 1:, ...]
-
-        dims = (
-            0,
-            2,
-            3,
-            4,
-        )  # Summing over batch (which is typically 1) and spatial dimensions for each class
-
-        # In intersection section it is basically multiplying vectors like [0.1, 0.2, 0.5, 0.2] by [0, 1, 0, 0],
-        # which results in [0, 0.2, 0, 0], then summing. This `soft` approach allows for partial credit,
-        # instead of receiving 0 in that example as the highest probability class was not the true class.
-        # This approach can help in gradient flow and learning.
-        intersection = (probs * one_hot).sum(dim=dims)
-
-        # In the denominator, we sum the probabilities and one-hot vectors
-        denom = probs.sum(dim=dims) + one_hot.sum(dim=dims)
-
-        dice_per_class = (2.0 * intersection + eps) / (denom + eps)
-
-        return 1.0 - dice_per_class.mean()
 
     def _dice_coefficient(
         self,
@@ -234,8 +205,7 @@ class Trainer:
 
                 self.optimizer.zero_grad(set_to_none=True)
                 outputs = self.model(images)
-                # loss = self._dice_loss(outputs, masks)
-                loss = self._focal_loss(outputs, masks)
+                loss = self._focal_loss(outputs, masks, self.focal_param_strategy)
                 loss.backward()
                 self.optimizer.step()
 
@@ -272,7 +242,7 @@ class Trainer:
                     images, masks = prepare_images_and_masks(images, masks, device)
 
                     outputs = self.model(images)
-                    loss = self._dice_loss(outputs, masks)
+                    loss = self._focal_loss(outputs, masks, self.focal_param_strategy)
 
                     dice = self._dice_coefficient(outputs, masks)
                     dice_scores.append(dice.item())
@@ -292,27 +262,28 @@ class Trainer:
     def _checkpoints_and_validation(
         self,
         checkpoints_enabled: bool,
-        save_dir: Path,
         epoch: int,
         val_dice: float,
     ):
+        save_config_enabled: bool = SUPER_COMPUTER_ENABLED or SAVE_BEST_MODEL
+
         if checkpoints_enabled:
             save_model(
-                save_dir=save_dir,
+                save_dir=self.save_dir,
                 epoch=epoch,
                 model_state_dict=self.model.state_dict(),
                 optimizer_state_dict=self.optimizer.state_dict(),
                 val_dice=val_dice,
             )
 
-        if val_dice > self.best_val_dice:
+        if val_dice > self.best_val_dice and save_config_enabled:
             self.best_val_dice = val_dice
             save_model(
-                save_dir=save_dir,
+                save_dir=self.save_dir,
                 epoch=epoch,
                 model_state_dict=self.model.state_dict(),
                 optimizer_state_dict=self.optimizer.state_dict(),
                 val_dice=val_dice,
                 is_best_model=True,
             )
-            print(f"Saved best model with Dice score: {val_dice:.4f}")
+            print(f"Saved best model with val_dice score: {val_dice:.4f}")
