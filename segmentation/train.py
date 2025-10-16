@@ -111,7 +111,7 @@ class Trainer:
         )
 
         if SUPER_COMPUTER_ENABLED or SAVE_BEST_MODEL:
-            self.save_dir: Path = self.data_config["save_dir"] / CURR_RUN
+            self.save_dir = self.data_config["save_dir"] / CURR_RUN
             self.save_dir.mkdir(exist_ok=True, parents=True)
 
         self.best_val_dice = 0.0
