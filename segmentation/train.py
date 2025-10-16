@@ -65,15 +65,12 @@ class Trainer:
         total_samples: int = -1,
         epochs: int = 5,
         device: str = "cpu",
-        checkpoints_enabled: bool = False,
     ):
         train_loader, val_loader = create_dataloaders(
             self.data_config, dataset_dir, total_samples
         )
 
-        self._pre_training_preparation(
-            train_loader, val_loader, checkpoints_enabled, device
-        )
+        self._pre_training_preparation(train_loader, val_loader, device)
 
         print(f"Training on device: {device}")
         start = time.time()
@@ -90,7 +87,7 @@ class Trainer:
             print(f"Val Loss: {val_loss:.4f}, Val Dice: {val_dice:.4f}")
 
             self.metric_saver.save(epoch, train_dice, val_dice)
-            self._checkpoints_and_validation(checkpoints_enabled, epoch, val_dice)
+            self._save_best_model_if_possible(epoch, val_dice)
 
         self.graph_maker.make_summary_of_results(epochs)
         train_time = int(time.time() - start)
@@ -100,7 +97,6 @@ class Trainer:
         self,
         train_loader: DataLoader,
         val_loader: DataLoader,
-        checkpoints_enabled: bool,
         device: str,
     ):
         class_distribution = ClassDistributionAnalyzer(train_loader, val_loader)
@@ -114,7 +110,7 @@ class Trainer:
             class_distribution.proportions, self.metric_saver
         )
 
-        if SUPER_COMPUTER_ENABLED or SAVE_BEST_MODEL or checkpoints_enabled:
+        if SUPER_COMPUTER_ENABLED or SAVE_BEST_MODEL:
             self.save_dir: Path = self.data_config["save_dir"] / CURR_RUN
             self.save_dir.mkdir(exist_ok=True, parents=True)
 
@@ -259,22 +255,12 @@ class Trainer:
             np.mean(dice_scores) if dice_scores else 0.0
         )
 
-    def _checkpoints_and_validation(
+    def _save_best_model_if_possible(
         self,
-        checkpoints_enabled: bool,
         epoch: int,
         val_dice: float,
     ):
         save_config_enabled: bool = SUPER_COMPUTER_ENABLED or SAVE_BEST_MODEL
-
-        if checkpoints_enabled:
-            save_model(
-                save_dir=self.save_dir,
-                epoch=epoch,
-                model_state_dict=self.model.state_dict(),
-                optimizer_state_dict=self.optimizer.state_dict(),
-                val_dice=val_dice,
-            )
 
         if val_dice > self.best_val_dice and save_config_enabled:
             self.best_val_dice = val_dice

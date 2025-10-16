@@ -21,8 +21,8 @@ def example_train():
         model = UNet3D(
             in_channels=4,
             num_classes=4,
-            level_channels=[32, 64, 128],
-            bottleneck_channels=256,
+            level_channels=[64, 128, 256],
+            bottleneck_channels=512,
         )
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=3e-4)
@@ -36,10 +36,9 @@ def example_train():
 
     trainer.train(
         dataset_dir=dataset_dir,
-        total_samples=100,
+        total_samples=20,
         epochs=500,
         device=device,
-        checkpoints_enabled=False,
     )
 
 
