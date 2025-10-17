@@ -1,5 +1,5 @@
 from pathlib import Path
-
+from torchsummary import summary  # type: ignore
 import numpy as np
 import torch
 from torch.nn import functional as F
@@ -13,12 +13,17 @@ def load_model(checkpoint_path: Path, device: str = "cpu") -> torch.nn.Module:
     model = UNet3D(
         in_channels=4,
         num_classes=4,
-        level_channels=[16, 32, 64],
-        bottleneck_channels=128,
     )
 
     checkpoint = torch.load(checkpoint_path, map_location=device)
     model.load_state_dict(checkpoint["model_state_dict"])
+
+    # THIS IS RESPONSIBLE FOR SCRIPTING THE MODEL, SAVING IT, AND LOADING IT BACK
+    scripted_model = torch.jit.script(model)
+    scripted_model.save(checkpoint_path.parent / "best_model_scripted.pt")
+    loaded_model = torch.jit.load(checkpoint_path.parent / "best_model_scripted.pt")
+    # END
+
     model.to(device)
     model.eval()
 
@@ -92,5 +97,5 @@ def example_predict(model_dir: str) -> np.ndarray:
 
 
 if __name__ == "__main__":
-    model_dir = "run_20250615_174353"
+    model_dir = "run_20251011_114333"
     example_predict(model_dir=model_dir)
