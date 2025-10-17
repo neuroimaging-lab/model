@@ -1,5 +1,5 @@
 from pathlib import Path
-from torchsummary import summary  # type: ignore
+
 import numpy as np
 import torch
 from torch.nn import functional as F
@@ -97,5 +97,5 @@ def example_predict(model_dir: str) -> np.ndarray:
 
 
 if __name__ == "__main__":
-    model_dir = "run_20251011_114333"
+    model_dir = "run_20250615_174353"
     example_predict(model_dir=model_dir)
