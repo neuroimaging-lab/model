@@ -39,7 +39,6 @@ class Trainer:
         save_dir: Path | str = "checkpoints",
         num_workers: int = 2,
         pin_memory: bool = True,
-        include_bg: bool = False,  # Background (usually dominant) can negatively impact Dice score
     ):
         self.model = model
         self.optimizer = optimizer
@@ -52,7 +51,6 @@ class Trainer:
             "pin_memory": pin_memory,
         }
 
-        self.include_bg = include_bg
         self.graph_maker = GraphMaker()
         self.metric_saver = MetricSaver()
         self.best_val_dice: float = 0.0
@@ -115,6 +113,11 @@ class Trainer:
             self.save_dir.mkdir(exist_ok=True, parents=True)
 
         self.best_val_dice = 0.0
+
+        if device.startswith("cuda") and torch.cuda.device_count() > 1:
+            print(f"Using {torch.cuda.device_count()} GPUs with DataParallel")
+            self.model = torch.nn.DataParallel(self.model)
+
         self.model = self.model.to(device)
 
     def _focal_loss(
@@ -170,10 +173,6 @@ class Trainer:
 
         pred = F.one_hot(preds, num_classes=c).permute(0, 4, 1, 2, 3).float()
         tgt = F.one_hot(tgt, num_classes=c).permute(0, 4, 1, 2, 3).float()
-
-        if not self.include_bg and c > 1:
-            pred = pred[:, 1:, ...]
-            tgt = tgt[:, 1:, ...]
 
         dims = (0, 2, 3, 4)
 
@@ -270,6 +269,5 @@ class Trainer:
                 model_state_dict=self.model.state_dict(),
                 optimizer_state_dict=self.optimizer.state_dict(),
                 val_dice=val_dice,
-                is_best_model=True,
             )
             print(f"Saved best model with val_dice score: {val_dice:.4f}")

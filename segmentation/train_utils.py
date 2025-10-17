@@ -105,14 +105,10 @@ def save_model(
     model_state_dict: dict[str, Any],
     optimizer_state_dict: dict[str, Any],
     val_dice: float,
-    is_best_model: bool = False,
 ) -> None:
     """Save the model and optimizer state dictionaries to a file."""
-    filepath = (
-        save_dir / f"epoch_{epoch}.pth"
-        if not is_best_model
-        else save_dir / "best_model.pth"
-    )
+    filepath = save_dir / "best_model.pth"
+
     torch.save(
         {
             "epoch": epoch,

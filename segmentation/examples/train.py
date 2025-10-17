@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 import torch
@@ -17,6 +18,9 @@ def example_train():
             in_channels=4,
             num_classes=4,
         )
+        scratch = os.environ.get("SCRATCH")
+        if scratch:
+            dataset_dir = Path(scratch) / "ndziwak" / "data" / "Task01_BrainTumour"
     else:
         model = UNet3D(
             in_channels=4,
@@ -37,7 +41,7 @@ def example_train():
     trainer.train(
         dataset_dir=dataset_dir,
         total_samples=20,
-        epochs=500,
+        epochs=10,
         device=device,
     )
 
