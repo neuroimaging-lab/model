@@ -19,7 +19,8 @@ class FocalParamStrategy:
         gamma: float = 2.0,
         eps: float = 1e-6,
     ):
-        """Calculates alpha values based on the provided strategy and class proportions.
+        """
+        Calculates alpha values based on the provided strategy and class proportions.
         Saves the parameters to a text file.
         """
         self._class_proportions: Dict[str, float] = class_proportions
@@ -34,9 +35,7 @@ class FocalParamStrategy:
     def _compute_alpha(
         self, strategy: Literal["inverse", "inverse_sqrt", "log_scaling"]
     ) -> list[float]:
-        """
-        Computes the alpha parameter for each class based on its proportion.
-        """
+        """Computes the alpha parameter for each class based on its proportion."""
         if strategy == "inverse":
             res_dict = self._calculate_inverse_frequency()
         elif strategy == "inverse_sqrt":

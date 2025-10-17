@@ -27,9 +27,8 @@ class GraphMaker:
         random.seed(42)
 
         target_labels = target_labels.squeeze(1)  # [B, D, H, W]
-        num_slices = target_labels.shape[1]  # Number of slices in depth dimension
+        num_slices = target_labels.shape[1]
 
-        # Generate and shuffle indices
         indices = list(range(num_slices))
         random.shuffle(indices)
 
