@@ -34,6 +34,7 @@ def example_train():
     trainer = Trainer(
         model=model,
         optimizer=optimizer,
+        batch_size=4 if SUPER_COMPUTER_ENABLED else 1,
     )
 
     device = "cuda" if torch.cuda.is_available() else "cpu"

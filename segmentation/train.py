@@ -115,7 +115,7 @@ class Trainer:
         self.best_val_dice = 0.0
 
         if device.startswith("cuda") and torch.cuda.device_count() > 1:
-            print(f"Using {torch.cuda.device_count()} GPUs with DataParallel")
+            print(f"\nUsing {torch.cuda.device_count()} GPUs with DataParallel")
             self.model = torch.nn.DataParallel(self.model)
 
         self.model = self.model.to(device)
@@ -137,19 +137,16 @@ class Trainer:
         Returns:
             Focal loss value as a single scalar tensor.
         """
-        # Normalize logits to probabilities using softmax
         probs = F.softmax(logits, dim=1)  # (B, C, D, H, W)
         c = probs.shape[1]
 
-        # Convert target to one-hot encoding
         tgt = target.squeeze(1).long()  # (B, D, H, W)
         one_hot = (
             F.one_hot(tgt, num_classes=c).permute(0, 4, 1, 2, 3).float()
         )  # (B, C, D, H, W)
 
-        # Compute the focal loss
         pt = (probs * one_hot).sum(dim=1)  # Probability of the true class (B, D, H, W)
-        log_pt = torch.log(pt + params.eps)  # Log probability of the true class
+        log_pt = torch.log(pt + params.eps)
         focal_term = (
             1 - pt
         ) ** params.gamma  # Focusing term to emphasize hard examples
@@ -157,7 +154,7 @@ class Trainer:
         alpha_t = torch.tensor(params.alpha, dtype=logits.dtype, device=logits.device)
         alpha_t = alpha_t[tgt]
 
-        loss = -alpha_t * focal_term * log_pt  # Focal loss formula
+        loss = -alpha_t * focal_term * log_pt
         return loss.mean()
 
     def _dice_coefficient(
@@ -176,8 +173,6 @@ class Trainer:
 
         dims = (0, 2, 3, 4)
 
-        # Here we no longer have floats in pred vectors, now we use argmax, so we have hard predictions
-        # and the only way to get non 0 value, is if the class is the same in both pred and tgt
         intersection = (pred * tgt).sum(dim=dims)
         denom = pred.sum(dim=dims) + tgt.sum(dim=dims)
 
