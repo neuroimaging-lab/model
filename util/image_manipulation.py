@@ -1,4 +1,13 @@
-def cut_images_and_masks(images, masks):
+import torch
+
+
+def cut_images_and_masks(
+    images: torch.Tensor, masks: torch.Tensor
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """
+    Reduces voxel dimensions for the images and correspoding masks, by center-cropping.
+    Used as a test tool for the local development - (e.g. 160x240x240 → 80x160x160) - to be able to fit an MRI image inside a model with full channels.
+    """
     depth = 80  # base 160
     height = 160  # base 240
     width = 160  # base 240

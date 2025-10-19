@@ -15,9 +15,8 @@ class FocalParamStrategy:
         self,
         class_proportions: Dict[str, float],
         metric_saver: MetricSaver,
-        strategy: Literal["inverse", "inverse_sqrt", "log_scaling"] = "inverse",
+        strategy: Literal["inverse", "inverse_sqrt", "log_scaling"] = "inverse_sqrt",
         gamma: float = 2.0,
-        eps: float = 1e-6,
     ):
         """
         Calculates alpha values based on the provided strategy and class proportions.
@@ -25,7 +24,7 @@ class FocalParamStrategy:
         """
         self._class_proportions: Dict[str, float] = class_proportions
         self.gamma: float = gamma
-        self.eps: float = eps
+        self.EPSILON: float = 1e-6
         self.alpha: list[float] = self._compute_alpha(strategy)
         metric_saver.save_txt_file(
             f"strategy: {strategy}\ngamma: {self.gamma}\nalpha: {self.alpha}\n",
@@ -45,12 +44,17 @@ class FocalParamStrategy:
         else:
             raise ValueError(f"Unknown strategy: {strategy}")
 
+        return self._get_and_print_strategy_results(strategy, res_dict)
+
+    def _get_and_print_strategy_results(
+        self, strategy: str, res_dict: dict[str, float]
+    ) -> list[float]:
         print(f"Computed alpha values using '{strategy}' strategy:")
         result = []
         for label in DATA_LABELS:
             result.append(res_dict[label])
             print(f"{label}: {res_dict[label]:.4f}")
-
+        print()
         return result
 
     def _calculate_inverse_frequency(self) -> dict[str, float]:

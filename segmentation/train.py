@@ -11,16 +11,16 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from segmentation.config import CURR_RUN, SAVE_BEST_MODEL, SUPER_COMPUTER_ENABLED
+from segmentation.config import CLUSTER_COMPUTER_ENABLED, CURR_RUN, SAVE_BEST_MODEL
 from segmentation.focal_param_strategy import FocalParamStrategy
-from segmentation.train_utils import (
+from util.class_distribution_analyzer import ClassDistributionAnalyzer
+from util.graph_maker import GraphMaker
+from util.metric_saver import MetricSaver
+from util.train_support import (
     create_dataloaders,
     prepare_images_and_masks,
     save_model,
 )
-from util.class_distribution_analyzer import ClassDistributionAnalyzer
-from util.graph_maker import GraphMaker
-from util.metric_saver import MetricSaver
 
 
 class Trainer:
@@ -108,7 +108,7 @@ class Trainer:
             class_distribution.proportions, self.metric_saver
         )
 
-        if SUPER_COMPUTER_ENABLED or SAVE_BEST_MODEL:
+        if CLUSTER_COMPUTER_ENABLED or SAVE_BEST_MODEL:
             self.save_dir = self.data_config["save_dir"] / CURR_RUN
             self.save_dir.mkdir(exist_ok=True, parents=True)
 
@@ -124,18 +124,10 @@ class Trainer:
         self,
         logits: torch.Tensor,  # (B, C, D, H, W)
         target: torch.Tensor,  # (B, 1, D, H, W) containing class indices (dtype long)
-        params: FocalParamStrategy,  # contains alpha, gamma and epsilon
+        params: FocalParamStrategy,  # Contains alpha, gamma and epsilon
     ) -> torch.Tensor:
         """
-        Multi-class Focal Loss for imbalanced datasets.
-        Args:
-            logits: Raw model outputs (logits) of shape (B, C, D, H, W).
-            target: Ground truth tensor of shape (B, 1, D, H, W) containing class indices.
-            alpha: Balancing factor
-            gamma: Focusing parameter to reduce loss contribution from easy examples.
-            eps: Small value to avoid division by zero.
-        Returns:
-            Focal loss value as a single scalar tensor.
+        Multi-class Focal Loss for imbalanced datasets. Source: https://arxiv.org/pdf/1708.02002
         """
         probs = F.softmax(logits, dim=1)  # (B, C, D, H, W)
         c = probs.shape[1]
@@ -146,7 +138,7 @@ class Trainer:
         )  # (B, C, D, H, W)
 
         pt = (probs * one_hot).sum(dim=1)  # Probability of the true class (B, D, H, W)
-        log_pt = torch.log(pt + params.eps)
+        log_pt = torch.log(pt + params.EPSILON)
         focal_term = (
             1 - pt
         ) ** params.gamma  # Focusing term to emphasize hard examples
@@ -254,7 +246,7 @@ class Trainer:
         epoch: int,
         val_dice: float,
     ):
-        save_config_enabled: bool = SUPER_COMPUTER_ENABLED or SAVE_BEST_MODEL
+        save_config_enabled: bool = CLUSTER_COMPUTER_ENABLED or SAVE_BEST_MODEL
 
         if val_dice > self.best_val_dice and save_config_enabled:
             self.best_val_dice = val_dice
