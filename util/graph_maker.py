@@ -1,3 +1,5 @@
+import ast
+import csv
 import os
 import random
 from typing import Optional
@@ -19,6 +21,8 @@ class GraphMaker:
 
         self.slices_dir_path = f"{METRICS_DIR}slices/"
         self.slice_idx = None
+        self.metrics_path: str = METRICS_DIR + "metrics.csv"
+
         os.makedirs(self.slices_dir_path)
 
     def _find_slice_idx_with_all_classes(
@@ -101,9 +105,13 @@ class GraphMaker:
         epochs: int,
         slice_file: str = "summary.png",
         dice_plot_file: str = "dice_plot.png",
+        dice_per_class_file: str = "dice_per_class_plot.png",
     ):
         plot = self._make_dice_summary_plot()
         plot.savefig(os.path.join(METRICS_DIR, dice_plot_file))
+
+        plot_2 = self._make_dice_per_class_summary_plot()
+        plot_2.savefig(os.path.join(METRICS_DIR, dice_per_class_file))
 
         summary_img = self._prepare_slice_summary_image(epochs)
         summary_img.save(os.path.join(METRICS_DIR, slice_file))
@@ -137,8 +145,7 @@ class GraphMaker:
         return summary_img
 
     def _make_dice_summary_plot(self):
-        metrics_path = METRICS_DIR + "metrics.csv"
-        data = np.genfromtxt(metrics_path, delimiter=",", skip_header=1)
+        data = np.genfromtxt(self.metrics_path, delimiter=";", skip_header=1)
 
         epochs = data[:, 0]
         train_dice = data[:, 1]
@@ -175,6 +182,63 @@ class GraphMaker:
         ax.grid(True, linestyle="--", alpha=0.6)
         ax.legend(fontsize=10, loc="lower right")
 
+        plt.tight_layout()
+
+        return fig
+
+    def _make_dice_per_class_summary_plot(self):
+        epochs = []
+        train_per_class_dice = []
+        val_per_class_dice = []
+
+        with open(self.metrics_path, encoding="utf-8") as f:
+            reader = csv.reader(f, delimiter=";")
+            next(reader)
+            for row in reader:
+                epochs.append(int(row[0]))
+                train_per_class_dice.append(ast.literal_eval(row[3]))
+                val_per_class_dice.append(ast.literal_eval(row[4]))
+
+        epochs = np.array(epochs)
+        train_per_class_dice = np.array(train_per_class_dice)
+        val_per_class_dice = np.array(val_per_class_dice)
+
+        num_classes = len(DATA_LABELS)
+        fig, axes = plt.subplots(2, 2, figsize=(10, 8))
+        axes = axes.flatten()
+
+        for i in range(num_classes):
+            ax = axes[i]
+
+            ax.plot(
+                epochs,
+                train_per_class_dice[:, i],
+                label="Train Dice",
+                color="blue",
+                linewidth=2,
+                marker="o",
+            )
+            ax.plot(
+                epochs,
+                val_per_class_dice[:, i],
+                label="Validation Dice",
+                color="orange",
+                linewidth=2,
+                marker="s",
+            )
+
+            ax.set_title(f"{DATA_LABELS[i]}", fontsize=12, fontweight="bold")
+            ax.set_xlabel("Epoch", fontsize=10)
+            ax.set_ylabel("Dice Score", fontsize=10)
+            ax.set_ylim(0, 1)
+            ax.grid(True, linestyle="--", alpha=0.6)
+            ax.legend(fontsize=9, loc="lower right")
+
+        plt.suptitle(
+            "Per-Class Dice Coefficient During Training and Validation",
+            fontsize=14,
+            fontweight="bold",
+        )
         plt.tight_layout()
 
         return fig

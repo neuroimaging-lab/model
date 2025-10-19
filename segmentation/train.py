@@ -75,16 +75,20 @@ class Trainer:
         for epoch in range(epochs + 1):
             print(f"\nEpoch {epoch}/{epochs}")
 
-            train_loss, train_dice = self._train_one_epoch(train_loader, device)
+            train_loss, train_dice, train_per_class_dice = self._train_one_epoch(
+                train_loader, device
+            )
             print(f"Train Loss: {train_loss:.4f}, Train Dice: {train_dice:.4f}")
+
+            val_loss, val_dice, val_per_class_dice = self._validate(val_loader, device)
+            print(f"Val Loss: {val_loss:.4f}, Val Dice: {val_dice:.4f}")
 
             if epoch % 5 == 0:
                 self.graph_maker.save_slice(epoch, train_dice)
 
-            val_loss, val_dice = self._validate(val_loader, device)
-            print(f"Val Loss: {val_loss:.4f}, Val Dice: {val_dice:.4f}")
-
-            self.metric_saver.save(epoch, train_dice, val_dice)
+            self.metric_saver.save(
+                epoch, train_dice, train_per_class_dice, val_dice, val_per_class_dice
+            )
             self._save_best_model_if_possible(epoch, val_dice)
 
         self.graph_maker.make_summary_of_results(epochs)
@@ -149,13 +153,13 @@ class Trainer:
         loss = -alpha_t * focal_term * log_pt
         return loss.mean()
 
-    def _dice_coefficient(
+    def _dice_coefficient_per_class(
         self,
         logits: torch.Tensor,  # (B, C, D, H, W)
         target: torch.Tensor,  # (B, 1, D, H, W) containing class indices (int)
         eps: float = 1e-6,
     ) -> torch.Tensor:
-        """Multi-class Dice on argmax predictions. Returns mean Dice across classes."""
+        """Multi-class Dice on argmax predictions. Returns a dice_per_class."""
         preds = torch.argmax(logits, dim=1)  # (B, D, H, W)
         c = logits.shape[1]
         tgt = target.squeeze(1).long()  # (B, D, H, W)
@@ -170,16 +174,16 @@ class Trainer:
 
         dice_per_class = (2.0 * intersection + eps) / (denom + eps)
 
-        return dice_per_class.mean()
+        return dice_per_class
 
     def _train_one_epoch(
         self,
         dataloader: DataLoader,
         device: str,
-    ) -> Tuple[float, float]:
+    ) -> Tuple[float, float, list[float]]:
         self.model.train()
         epoch_loss: float = 0.0
-        dice_scores: List[float] = []
+        dice_scores_per_class: List[torch.Tensor] = []
 
         with tqdm(dataloader, desc="Training") as progress:
             for i, (images, masks) in enumerate(progress):
@@ -192,8 +196,8 @@ class Trainer:
                 self.optimizer.step()
 
                 with torch.no_grad():
-                    dice = self._dice_coefficient(outputs, masks)
-                    dice_scores.append(dice.item())
+                    dice_per_class = self._dice_coefficient_per_class(outputs, masks)
+                    dice_scores_per_class.append(dice_per_class)
                     epoch_loss += loss.item()
 
                 if i == 0:
@@ -202,21 +206,27 @@ class Trainer:
                     )
 
                 progress.set_postfix(
-                    {"loss": f"{loss.item():.4f}", "dice": f"{dice_scores[-1]:.4f}"}
+                    {
+                        "loss": f"{loss.item():.4f}",
+                        "dice": f"{dice_per_class.mean().item():.4f}",
+                    }
                 )
 
-        return epoch_loss / max(1, len(dataloader)), float(
-            np.mean(dice_scores) if dice_scores else 0.0
+        mean_per_class_dices: list = (
+            torch.stack(dice_scores_per_class).mean(dim=0).cpu().numpy().tolist()
         )
+        mean_dice: float = float(np.mean(mean_per_class_dices))
+
+        return epoch_loss / max(1, len(dataloader)), mean_dice, mean_per_class_dices
 
     def _validate(
         self,
         dataloader: DataLoader,
         device: str,
-    ) -> Tuple[float, float]:
+    ) -> Tuple[float, float, list[float]]:
         self.model.eval()
         val_loss: float = 0.0
-        dice_scores: List[float] = []
+        dice_scores_per_class: List[torch.Tensor] = []
 
         with torch.no_grad():
             with tqdm(dataloader, desc="Validation") as progress:
@@ -225,21 +235,24 @@ class Trainer:
 
                     outputs = self.model(images)
                     loss = self._focal_loss(outputs, masks, self.focal_param_strategy)
-
-                    dice = self._dice_coefficient(outputs, masks)
-                    dice_scores.append(dice.item())
                     val_loss += loss.item()
+
+                    dice_per_class = self._dice_coefficient_per_class(outputs, masks)
+                    dice_scores_per_class.append(dice_per_class)
 
                     progress.set_postfix(
                         {
                             "val_loss": f"{loss.item():.4f}",
-                            "val_dice": f"{dice_scores[-1]:.4f}",
+                            "val_dice": f"{dice_per_class.mean().item():.4f}",
                         }
                     )
 
-        return val_loss / max(1, len(dataloader)), float(
-            np.mean(dice_scores) if dice_scores else 0.0
+        mean_per_class_dices: list = (
+            torch.stack(dice_scores_per_class).mean(dim=0).cpu().numpy().tolist()
         )
+        mean_dice: float = float(np.mean(mean_per_class_dices))
+
+        return val_loss / max(1, len(dataloader)), mean_dice, mean_per_class_dices
 
     def _save_best_model_if_possible(
         self,
