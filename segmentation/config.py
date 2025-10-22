@@ -2,12 +2,14 @@ from datetime import datetime
 import os
 from pathlib import Path
 
-CLUSTER_COMPUTER_ENABLED = True  # NOTE: If False, 3D MRI images are center-cropped to fit into GPU memory, reducing their voxel dimensions (e.g. 160x240x240 → 80x160x160).
+CLUSTER_TRAINING_ENABLED = True  # NOTE: If False, 3D MRI images are center-cropped to fit into GPU memory, reducing their voxel dimensions (e.g. 160x240x240 → 80x160x160).
 
 
 def get_dataset_dir():
-    scratch = os.environ.get("SCRATCH")
-    if CLUSTER_COMPUTER_ENABLED and scratch:
+    scratch = os.environ.get(
+        "SCRATCH"
+    )  # High-speed storage avilable in cluster environment
+    if CLUSTER_TRAINING_ENABLED and scratch:
         return Path(scratch) / "ndziwak" / "data" / "Task01_BrainTumour"
     else:
         return Path(__file__).parent.parent / "datasets" / "Task01_BrainTumour"

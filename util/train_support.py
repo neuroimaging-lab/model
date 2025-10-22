@@ -4,7 +4,7 @@ from typing import Any, Tuple, Union
 import torch
 from torch.utils.data import DataLoader
 
-from segmentation.config import CLUSTER_COMPUTER_ENABLED
+from segmentation.config import CLUSTER_TRAINING_ENABLED
 from segmentation.dataset import BrainTumorDataset
 from segmentation.transforms import train_transforms
 from util.image_manipulation import cut_images_and_masks
@@ -41,7 +41,7 @@ def get_datasets(
         total_samples = max_total_samples
     else:
         final_dataset = full_dataset
-        total_samples = final_dataset.__sizeof__()
+        total_samples = len(final_dataset)
 
     print(f"Total samples in dataset: {total_samples}")
     val_size = int(val_split * total_samples)
@@ -148,7 +148,7 @@ def ensure_class_indices(target: torch.Tensor, num_classes: int) -> torch.Tensor
 def prepare_images_and_masks(
     images: torch.Tensor, masks: torch.Tensor, device: str
 ) -> Tuple[torch.Tensor, torch.Tensor]:
-    if not CLUSTER_COMPUTER_ENABLED:
+    if not CLUSTER_TRAINING_ENABLED:
         images, masks = cut_images_and_masks(images, masks)
 
     images = images.to(device, non_blocking=True)

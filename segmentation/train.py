@@ -11,7 +11,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from segmentation.config import CLUSTER_COMPUTER_ENABLED, CURR_RUN, SAVE_BEST_MODEL
+from segmentation.config import CLUSTER_TRAINING_ENABLED, CURR_RUN, SAVE_BEST_MODEL
 from segmentation.focal_param_strategy import FocalParamStrategy
 from util.class_distribution_analyzer import ClassDistributionAnalyzer
 from util.graph_maker import GraphMaker
@@ -112,7 +112,7 @@ class Trainer:
             class_distribution.proportions, self.metric_saver
         )
 
-        if CLUSTER_COMPUTER_ENABLED or SAVE_BEST_MODEL:
+        if CLUSTER_TRAINING_ENABLED or SAVE_BEST_MODEL:
             self.save_dir = self.data_config["save_dir"] / CURR_RUN
             self.save_dir.mkdir(exist_ok=True, parents=True)
 
@@ -259,7 +259,7 @@ class Trainer:
         epoch: int,
         val_dice: float,
     ):
-        save_config_enabled: bool = CLUSTER_COMPUTER_ENABLED or SAVE_BEST_MODEL
+        save_config_enabled: bool = CLUSTER_TRAINING_ENABLED or SAVE_BEST_MODEL
 
         if val_dice > self.best_val_dice and save_config_enabled:
             self.best_val_dice = val_dice

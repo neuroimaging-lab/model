@@ -1,12 +1,12 @@
 import torch
 
-from segmentation.config import CLUSTER_COMPUTER_ENABLED, DATASET_DIR
+from segmentation.config import CLUSTER_TRAINING_ENABLED, DATASET_DIR
 from segmentation.models.unet3d import UNet3D
 from segmentation.train import Trainer
 
 
 def example_train():
-    if CLUSTER_COMPUTER_ENABLED:
+    if CLUSTER_TRAINING_ENABLED:
         model = UNet3D(
             in_channels=4,
             num_classes=4,
@@ -26,7 +26,7 @@ def example_train():
     trainer = Trainer(
         model=model,
         optimizer=optimizer,
-        batch_size=4 if CLUSTER_COMPUTER_ENABLED else 1,
+        batch_size=4 if CLUSTER_TRAINING_ENABLED else 1,
     )
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
