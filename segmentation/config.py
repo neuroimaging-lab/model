@@ -8,7 +8,7 @@ CLUSTER_TRAINING_ENABLED = True  # NOTE: If False, 3D MRI images are center-crop
 def get_dataset_dir():
     scratch = os.environ.get(
         "SCRATCH"
-    )  # High-speed storage avilable in cluster environment
+    )  # High-speed storage available in cluster environment
     if CLUSTER_TRAINING_ENABLED and scratch:
         return Path(scratch) / "ndziwak" / "data" / "Task01_BrainTumour"
     else:
