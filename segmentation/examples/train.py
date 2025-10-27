@@ -1,38 +1,41 @@
-from pathlib import Path
-
 import torch
 
+from segmentation.config import CLUSTER_TRAINING_ENABLED, DATASET_DIR
 from segmentation.models.unet3d import UNet3D
 from segmentation.train import Trainer
 
 
 def example_train():
-    current_dir = Path(__file__).parent
-    project_root = current_dir.parent.parent
-    dataset_dir = project_root / "datasets" / "Task01_BrainTumour"
-
-    model = UNet3D(
-        in_channels=4,
-        num_classes=4,
-        level_channels=[16, 32, 64],
-        bottleneck_channels=128,
-    )
+    if CLUSTER_TRAINING_ENABLED:
+        model = UNet3D(
+            in_channels=4,
+            num_classes=4,
+            level_channels=[64, 128, 256],
+            bottleneck_channels=512,
+        )
+    else:
+        model = UNet3D(
+            in_channels=4,
+            num_classes=4,
+            level_channels=[64, 128, 256],
+            bottleneck_channels=512,
+        )
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=3e-4)
 
     trainer = Trainer(
         model=model,
         optimizer=optimizer,
+        batch_size=4 if CLUSTER_TRAINING_ENABLED else 1,
     )
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
     trainer.train(
-        dataset_dir=dataset_dir,
-        total_samples=10,
-        epochs=3,
+        dataset_dir=DATASET_DIR,
+        total_samples=20,
+        epochs=10,
         device=device,
-        checkpoints_enabled=True,
     )
 
 
