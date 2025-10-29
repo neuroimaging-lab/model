@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import timedelta
 from pathlib import Path
 import time
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import torch
@@ -63,12 +63,14 @@ class Trainer:
         total_samples: int = -1,
         epochs: int = 5,
         device: str = "cpu",
+        gamma: Optional[float] = None,
+        alpha: Optional[float] = None,
     ):
         train_loader, val_loader = create_dataloaders(
             self.data_config, dataset_dir, total_samples
         )
 
-        self._pre_training_preparation(train_loader, val_loader, device)
+        self._pre_training_preparation(train_loader, val_loader, device, gamma, alpha)
 
         print(f"Training on device: {device}")
         start = time.time()
@@ -100,6 +102,8 @@ class Trainer:
         train_loader: DataLoader,
         val_loader: DataLoader,
         device: str,
+        gamma: Optional[float],
+        alpha: Optional[float],
     ):
         class_distribution = ClassDistributionAnalyzer(train_loader, val_loader)
         class_distribution.print_probability_of_each_class()
@@ -108,9 +112,17 @@ class Trainer:
             filename="class_distribution.txt",
         )
 
-        self.focal_param_strategy = FocalParamStrategy(
-            class_distribution.proportions, self.metric_saver
-        )
+        if gamma is not None and alpha is not None:
+            self.focal_param_strategy = FocalParamStrategy(
+                class_distribution.proportions,
+                self.metric_saver,
+                gamma,
+                explicite_alpha=alpha,
+            )
+        else:
+            self.focal_param_strategy = FocalParamStrategy(
+                class_distribution.proportions, self.metric_saver
+            )
 
         if CLUSTER_TRAINING_ENABLED or SAVE_BEST_MODEL:
             self.save_dir = self.data_config["save_dir"] / CURR_RUN

@@ -1,5 +1,5 @@
 import math
-from typing import Dict, Literal
+from typing import Dict, Literal, Optional
 
 from segmentation.config import DATA_LABELS
 from util.metric_saver import MetricSaver
@@ -15,19 +15,39 @@ class FocalParamStrategy:
         self,
         class_proportions: Dict[str, float],
         metric_saver: MetricSaver,
-        strategy: Literal["inverse", "inverse_sqrt", "log_scaling"] = "inverse_sqrt",
         gamma: float = 2.0,
+        explicite_alpha: Optional[float] = None,
+        strategy: Literal["inverse", "inverse_sqrt", "log_scaling"] = "inverse_sqrt",
     ):
         """
-        Calculates alpha values based on the provided strategy and class proportions.
+        Calculates alpha values based on the provided strategy and class proportions if no explicite alpha provided.
+        If explicite alpha provided, uses explicite_alpha for the foreground and 1-explicite_alpha for the background
         Saves the parameters to a text file.
         """
         self._class_proportions: Dict[str, float] = class_proportions
         self.gamma: float = gamma
         self.EPSILON: float = 1e-6
-        self.alpha: list[float] = self._compute_alpha(strategy)
+
+        self.alpha: list[float]
+        self.strategy: str
+
+        if explicite_alpha is not None:
+            self.alpha = [
+                1.0 - explicite_alpha,
+                explicite_alpha,
+                explicite_alpha,
+                explicite_alpha,
+            ]
+            self.strategy = "specified_by_hand"
+        else:
+            self.alpha = self._compute_alpha(strategy)
+            self.strategy = strategy
+
+        print(f"[INFO] Gamma value: {self.gamma}")
+        print(f"[INFO] Alpha values: {self.alpha}")
+
         metric_saver.save_txt_file(
-            f"strategy: {strategy}\ngamma: {self.gamma}\nalpha: {self.alpha}\n",
+            f"strategy: {self.strategy}\ngamma: {self.gamma}\nalpha: {self.alpha}\n",
             filename="focal_loss_params.txt",
         )
 
