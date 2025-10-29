@@ -4,7 +4,7 @@ from pathlib import Path
 
 CLUSTER_TRAINING_ENABLED = True  # NOTE: If False, 3D MRI images are center-cropped to fit into GPU memory, reducing their voxel dimensions (e.g. 160x240x240 → 80x160x160).
 
-os.environ["PYTORCH_ALLOC_CONF"] = "expandable_segments:True"
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
 
 def get_dataset_dir():
