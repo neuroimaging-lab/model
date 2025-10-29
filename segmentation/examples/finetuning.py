@@ -1,8 +1,6 @@
 from itertools import product
 import subprocess
 
-from segmentation.config import CLUSTER_TRAINING_ENABLED
-
 
 def fine_tune():
     gamma: list[float] = [2.0, 3.0, 4.0, 5.0]
@@ -21,22 +19,17 @@ def fine_tune():
             str(y),
             "--alpha",
             str(a),
+            "--store-checkpoints-in-temp-storage",
         ]
 
-        if CLUSTER_TRAINING_ENABLED:
-            command.insert(2, "--directory")
-            command.insert(3, "model")
-
-        print("\n" + "-" * 40)
-        print(f"Running {i + 1}/{len(param_combinations)} test...")
-        print("-" * 40 + "\n")
+        print("\n" + "-" * 40, flush=True)
+        print(f"Running {i + 1}/{len(param_combinations)} test...", flush=True)
+        print("-" * 40 + "\n", flush=True)
         result = subprocess.run(command)
         if result.returncode != 0:
             print(f"Process failed with parameters: {params}")
-            break
+            continue
         succes_iterations += 1
-        if succes_iterations == 2:
-            return
 
     print(
         f"End of fine tunning! {succes_iterations}/{len(param_combinations)} success iterations!"
