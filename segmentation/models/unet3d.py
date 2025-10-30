@@ -66,13 +66,19 @@ class DownBlock(nn.Module):
         return pooled, features
 
 
-class BottleNeck(ConvBlock):
+class BottleNeck(nn.Module):
     """
     Bottleneck block at the bottom of the U-Net.
     """
 
-    def __init__(self, in_channels: int, out_channels: int) -> None:
-        super().__init__(in_channels, out_channels)
+    def __init__(self, in_channels: int, out_channels: int, dropout_rate: float = 0.0) -> None:
+        super().__init__()
+        self.conv = ConvBlock(in_channels, out_channels)
+        self.dropout = nn.Dropout3d(p=dropout_rate)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.conv(x)
+        return self.dropout(x)
 
 
 class UpBlock(nn.Module):
@@ -115,15 +121,17 @@ class LastBlock(nn.Module):
     Final upsampling block with classification layer.
     """
 
-    def __init__(self, in_channels: int, out_channels: int, num_classes: int) -> None:
+    def __init__(self, in_channels: int, out_channels: int, num_classes: int, dropout_rate: float = 0.0) -> None:
         super().__init__()
         self.block = UpBlock(in_channels, out_channels)
+        self.dropout = nn.Dropout3d(p=dropout_rate)
         self.conv = nn.Conv3d(
             in_channels=in_channels // 2, out_channels=num_classes, kernel_size=1
         )
 
     def forward(self, x: torch.Tensor, residuals: torch.Tensor) -> torch.Tensor:
         x = self.block(x, residuals)
+        x = self.dropout(x)
         return self.conv(x)
 
 
@@ -138,15 +146,16 @@ class UNet3D(nn.Module):
         num_classes: int,
         level_channels: List[int] = [64, 128, 256],
         bottleneck_channels: int = 512,
+        dropout_rate: float = 0.0,
     ) -> None:
         super().__init__()
         self.down1 = DownBlock(in_channels, level_channels[0])
         self.down2 = DownBlock(level_channels[0], level_channels[1])
         self.down3 = DownBlock(level_channels[1], level_channels[2])
-        self.bottleneck = BottleNeck(level_channels[2], bottleneck_channels)
+        self.bottleneck = BottleNeck(level_channels[2], bottleneck_channels, dropout_rate)
         self.up3 = UpBlock(bottleneck_channels, level_channels[2])
         self.up2 = UpBlock(level_channels[2], level_channels[1])
-        self.up1 = LastBlock(level_channels[1], level_channels[0], num_classes)
+        self.up1 = LastBlock(level_channels[1], level_channels[0], num_classes, dropout_rate)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x, res1 = self.down1(x)

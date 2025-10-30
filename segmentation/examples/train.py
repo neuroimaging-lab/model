@@ -12,16 +12,18 @@ def example_train():
             num_classes=4,
             level_channels=[64, 128, 256],
             bottleneck_channels=512,
+            dropout_rate=0.5,
         )
     else:
         model = UNet3D(
             in_channels=4,
             num_classes=4,
-            level_channels=[64, 128, 256],
-            bottleneck_channels=512,
+            level_channels=[16, 32, 64],
+            bottleneck_channels=128,
+            dropout_rate=0.5,
         )
 
-    optimizer = torch.optim.AdamW(model.parameters(), lr=3e-4)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
 
     trainer = Trainer(
         model=model,
