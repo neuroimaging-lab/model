@@ -20,7 +20,7 @@ dev = ["ruff>=0.11.4", "mypy>=1.15.0", "types-tqdm"]
 
 
 [tool.mypy]
-exclude = [".venv"]
+exclude = [".venv", "library"]
 
 
 [tool.ruff.lint.isort]
