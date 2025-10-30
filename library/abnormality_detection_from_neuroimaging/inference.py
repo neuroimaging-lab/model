@@ -1,8 +1,10 @@
+# ruff: noqa: E402
 from pathlib import Path
 import sys
 
 project_root = Path(__file__).resolve().parents[2]
 sys.path.append(str(project_root))
+
 import nibabel as nib
 import numpy as np
 import torch
