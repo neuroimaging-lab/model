@@ -11,6 +11,7 @@ from segmentation.train import Trainer
 def example_train(
     gamma: Optional[float],
     alpha: Optional[float],
+    lr: Optional[float],
     store_checkpoints_in_temp_storage: bool,
 ):
     if CLUSTER_TRAINING_ENABLED:
@@ -28,8 +29,8 @@ def example_train(
             bottleneck_channels=512,
         )
 
-    optimizer = torch.optim.AdamW(model.parameters(), lr=3e-4)
-
+    optimizer = torch.optim.AdamW(model.parameters(), lr = lr if lr else 3e-4)
+    
     trainer = Trainer(
         model=model,
         optimizer=optimizer,
@@ -49,10 +50,11 @@ def example_train(
     )
 
 
-def parse_args() -> tuple[Optional[float], Optional[float], bool]:
+def parse_args() -> tuple[Optional[float], Optional[float], Optional[float], bool]:
     parser: ArgumentParser = ArgumentParser(description="Fine tunning runner")
     parser.add_argument("--gamma", nargs="+", type=float, help="Gamma value")
     parser.add_argument("--alpha", nargs="+", type=float, help="Alpha value")
+    parser.add_argument("--lr", nargs="+", type=float, help="Learning rate value")
     parser.add_argument(
         "--store-checkpoints-in-temp-storage",
         action="store_true",
@@ -61,9 +63,9 @@ def parse_args() -> tuple[Optional[float], Optional[float], bool]:
 
     try:
         args = parser.parse_args()
-        return args.gamma[0], args.alpha[0], args.store_checkpoints_in_temp_storage
+        return args.gamma[0], args.alpha[0], args.lr[0], args.store_checkpoints_in_temp_storage
     except Exception:
-        return None, None, False
+        return None, None, None, False
 
 
 if __name__ == "__main__":
