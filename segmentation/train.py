@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import timedelta
 from pathlib import Path
 import time
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import torch
@@ -11,7 +11,12 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from segmentation.config import CLUSTER_TRAINING_ENABLED, CURR_RUN, SAVE_BEST_MODEL
+from segmentation.config import (
+    CLUSTER_TRAINING_ENABLED,
+    CURR_RUN,
+    SAVE_BEST_MODEL,
+    get_temp_storage_path,
+)
 from segmentation.focal_param_strategy import FocalParamStrategy
 from util.class_distribution_analyzer import ClassDistributionAnalyzer
 from util.graph_maker import GraphMaker
@@ -39,6 +44,7 @@ class Trainer:
         save_dir: Path | str = "checkpoints",
         num_workers: int = 2,
         pin_memory: bool = True,
+        store_checkpoints_in_temp_storage: bool = False,
     ):
         self.model = model
         self.optimizer = optimizer
@@ -54,6 +60,7 @@ class Trainer:
         self.graph_maker = GraphMaker()
         self.metric_saver = MetricSaver()
         self.best_val_dice: float = 0.0
+        self.store_checkpoints_in_temp_storage: bool = store_checkpoints_in_temp_storage
         self.focal_param_strategy: FocalParamStrategy
         self.save_dir: Path
 
@@ -63,12 +70,14 @@ class Trainer:
         total_samples: int = -1,
         epochs: int = 5,
         device: str = "cpu",
+        gamma: Optional[float] = None,
+        alpha: Optional[float] = None,
     ):
         train_loader, val_loader = create_dataloaders(
             self.data_config, dataset_dir, total_samples
         )
 
-        self._pre_training_preparation(train_loader, val_loader, device)
+        self._pre_training_preparation(train_loader, val_loader, device, gamma, alpha)
 
         print(f"Training on device: {device}")
         start = time.time()
@@ -100,6 +109,8 @@ class Trainer:
         train_loader: DataLoader,
         val_loader: DataLoader,
         device: str,
+        gamma: Optional[float],
+        alpha: Optional[float],
     ):
         class_distribution = ClassDistributionAnalyzer(train_loader, val_loader)
         class_distribution.print_probability_of_each_class()
@@ -108,12 +119,25 @@ class Trainer:
             filename="class_distribution.txt",
         )
 
-        self.focal_param_strategy = FocalParamStrategy(
-            class_distribution.proportions, self.metric_saver
-        )
+        if gamma is not None and alpha is not None:
+            self.focal_param_strategy = FocalParamStrategy(
+                class_distribution.proportions,
+                self.metric_saver,
+                gamma,
+                explicite_alpha=alpha,
+            )
+        else:
+            self.focal_param_strategy = FocalParamStrategy(
+                class_distribution.proportions, self.metric_saver
+            )
 
         if CLUSTER_TRAINING_ENABLED or SAVE_BEST_MODEL:
-            self.save_dir = self.data_config["save_dir"] / CURR_RUN
+            if self.store_checkpoints_in_temp_storage:
+                self.save_dir = get_temp_storage_path() / CURR_RUN
+            else:
+                self.save_dir = self.data_config["save_dir"] / CURR_RUN
+
+            print(f"[INFO] Save dir for checkpoints: {self.save_dir}")
             self.save_dir.mkdir(exist_ok=True, parents=True)
 
         self.best_val_dice = 0.0
