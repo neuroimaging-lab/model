@@ -6,20 +6,12 @@ from segmentation.train import Trainer
 
 
 def example_train():
-    if CLUSTER_TRAINING_ENABLED:
-        model = UNet3D(
-            in_channels=4,
-            num_classes=4,
-            level_channels=[64, 128, 256],
-            bottleneck_channels=512,
-        )
-    else:
-        model = UNet3D(
-            in_channels=4,
-            num_classes=4,
-            level_channels=[64, 128, 256],
-            bottleneck_channels=512,
-        )
+    model = UNet3D(
+        in_channels=4,
+        num_classes=4,
+        level_channels=[64, 128, 256],
+        bottleneck_channels=512,
+    )
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=3e-4)
 
