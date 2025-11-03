@@ -6,8 +6,7 @@ from torch.utils.data import DataLoader
 
 from segmentation.config import CLUSTER_TRAINING_ENABLED
 from segmentation.dataset import BrainTumorDataset
-from segmentation.transforms import train_transforms
-from segmentation.transforms import val_transforms
+from segmentation.transforms import train_transforms, val_transforms
 from util.image_manipulation import cut_images_and_masks
 
 
@@ -30,8 +29,6 @@ def get_datasets(
         root_dir=str(root_dir),
         split="train",
         modalities=["FLAIR", "T1w", "t1gd", "T2w"],
-        transform=train_transforms,
-        target_transform=train_transforms,
         cache_data=False,
     )
 
@@ -51,7 +48,7 @@ def get_datasets(
 
     indices = list(range(total_samples))
     train_indices = indices[:train_size]
-    val_indices = indices[train_size: total_samples]
+    val_indices = indices[train_size:total_samples]
 
     train_dataset = torch.utils.data.Subset(full_dataset, train_indices)
     val_dataset = torch.utils.data.Subset(full_dataset, val_indices)
