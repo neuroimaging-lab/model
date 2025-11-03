@@ -7,6 +7,7 @@ from torch.utils.data import DataLoader
 from segmentation.config import CLUSTER_TRAINING_ENABLED
 from segmentation.dataset import BrainTumorDataset
 from segmentation.transforms import train_transforms
+from segmentation.transforms import val_transforms
 from util.image_manipulation import cut_images_and_masks
 
 
@@ -48,17 +49,24 @@ def get_datasets(
     val_size = max(1, val_size) if total_samples > 1 else 0
     train_size = total_samples - val_size
 
-    train_dataset = torch.utils.data.Subset(final_dataset, range(train_size))
+    indices = list(range(total_samples))
+    train_indices = indices[:train_size]
+    val_indices = indices[train_size: total_samples]
+
+    train_dataset = torch.utils.data.Subset(full_dataset, train_indices)
+    val_dataset = torch.utils.data.Subset(full_dataset, val_indices)
+
+    train_dataset.dataset.transform = train_transforms
+    train_dataset.dataset.target_transform = train_transforms
+
+    val_dataset.dataset.transform = val_transforms
+    val_dataset.dataset.target_transform = val_transforms
 
     if val_size <= 0:
         print(
             "No validation samples available, using the same as for the training."
         )  # It is strictly for overfitting check on 1 sample
         val_dataset = train_dataset
-    else:
-        val_dataset = torch.utils.data.Subset(
-            final_dataset, range(train_size, max_total_samples)
-        )
 
     print(
         f"Training samples: {len(train_dataset)}, Validation samples: {len(val_dataset)}"

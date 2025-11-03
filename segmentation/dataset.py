@@ -94,10 +94,8 @@ class BrainTumorDataset(Dataset):
             image, mask = self._load_and_cache_item(idx)
 
         if self.transform is not None:
-            image = self.transform(image)
-
-        if mask is not None and self.target_transform is not None:
-            mask = self.target_transform(mask)
+            augmented = self.transform({"image": image, "label": mask})
+            image, mask = augmented["image"], augmented["label"]
 
         return image, mask
 
