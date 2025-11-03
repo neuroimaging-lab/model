@@ -19,7 +19,7 @@ class ConvBlock(nn.Module):
     Used as part of the encoder and decoder in the U-Net architecture.
     """
 
-    def __init__(self, in_channels: int, out_channels: int) -> None:
+    def __init__(self, in_channels: int, out_channels: int, dropout_rate: float = 0.0) -> None:
         super().__init__()
         self.block = nn.Sequential(
             nn.Conv3d(
@@ -30,6 +30,7 @@ class ConvBlock(nn.Module):
             ),
             nn.BatchNorm3d(num_features=out_channels // 2),
             nn.ReLU(),
+            nn.Dropout3d(p=dropout_rate),
             nn.Conv3d(
                 in_channels=out_channels // 2,
                 out_channels=out_channels,
@@ -49,9 +50,9 @@ class DownBlock(nn.Module):
     Downsampling block used in the encoder part of the U-Net architecture.
     """
 
-    def __init__(self, in_channels: int, out_channels: int) -> None:
+    def __init__(self, in_channels: int, out_channels: int, dropout_rate: float = 0.0) -> None:
         super().__init__()
-        self.conv = ConvBlock(in_channels, out_channels)
+        self.conv = ConvBlock(in_channels, out_channels, dropout_rate)
         self.pool = nn.MaxPool3d(kernel_size=2, stride=2)
 
     def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -73,12 +74,10 @@ class BottleNeck(nn.Module):
 
     def __init__(self, in_channels: int, out_channels: int, dropout_rate: float = 0.0) -> None:
         super().__init__()
-        self.conv = ConvBlock(in_channels, out_channels)
-        self.dropout = nn.Dropout3d(p=dropout_rate)
+        self.conv = ConvBlock(in_channels, out_channels, dropout_rate)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.conv(x)
-        return self.dropout(x)
+        return self.conv(x)
 
 
 class UpBlock(nn.Module):
@@ -86,7 +85,7 @@ class UpBlock(nn.Module):
     Upsampling block used in the decoder part of the U-Net architecture.
     """
 
-    def __init__(self, in_channels: int, res_channels: int) -> None:
+    def __init__(self, in_channels: int, res_channels: int, dropout_rate: float = 0.0) -> None:
         super().__init__()
         self.upconv = nn.ConvTranspose3d(
             in_channels=in_channels, out_channels=in_channels, kernel_size=2, stride=2
@@ -100,6 +99,7 @@ class UpBlock(nn.Module):
             ),
             nn.BatchNorm3d(num_features=in_channels // 2),
             nn.ReLU(),
+            nn.Dropout3d(p=dropout_rate),
             nn.Conv3d(
                 in_channels=in_channels // 2,
                 out_channels=in_channels // 2,
@@ -123,15 +123,13 @@ class LastBlock(nn.Module):
 
     def __init__(self, in_channels: int, out_channels: int, num_classes: int, dropout_rate: float = 0.0) -> None:
         super().__init__()
-        self.block = UpBlock(in_channels, out_channels)
-        self.dropout = nn.Dropout3d(p=dropout_rate)
+        self.block = UpBlock(in_channels, out_channels, dropout_rate)
         self.conv = nn.Conv3d(
             in_channels=in_channels // 2, out_channels=num_classes, kernel_size=1
         )
 
     def forward(self, x: torch.Tensor, residuals: torch.Tensor) -> torch.Tensor:
         x = self.block(x, residuals)
-        x = self.dropout(x)
         return self.conv(x)
 
 
@@ -149,12 +147,12 @@ class UNet3D(nn.Module):
         dropout_rate: float = 0.0,
     ) -> None:
         super().__init__()
-        self.down1 = DownBlock(in_channels, level_channels[0])
-        self.down2 = DownBlock(level_channels[0], level_channels[1])
-        self.down3 = DownBlock(level_channels[1], level_channels[2])
+        self.down1 = DownBlock(in_channels, level_channels[0], dropout_rate)
+        self.down2 = DownBlock(level_channels[0], level_channels[1], dropout_rate)
+        self.down3 = DownBlock(level_channels[1], level_channels[2], dropout_rate)
         self.bottleneck = BottleNeck(level_channels[2], bottleneck_channels, dropout_rate)
-        self.up3 = UpBlock(bottleneck_channels, level_channels[2])
-        self.up2 = UpBlock(level_channels[2], level_channels[1])
+        self.up3 = UpBlock(bottleneck_channels, level_channels[2], dropout_rate)
+        self.up2 = UpBlock(level_channels[2], level_channels[1], dropout_rate)
         self.up1 = LastBlock(level_channels[1], level_channels[0], num_classes, dropout_rate)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
