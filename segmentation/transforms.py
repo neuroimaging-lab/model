@@ -12,7 +12,7 @@ train_transforms = Compose([
 
     RandFlipD(keys=["image", "label"], prob=0.5, spatial_axis=[0]),
     RandFlipD(keys=["image", "label"], prob=0.5, spatial_axis=[1]),
-    RandFlipD(keys=["image", "label"], prob=1, spatial_axis=[2]),
+    RandFlipD(keys=["image", "label"], prob=0.5, spatial_axis=[2]),
 
     RandRotateD(keys=["image", "label"], range_x=0.2, prob=0.3, mode=["bilinear", "nearest"]),
     RandRotateD(keys=["image", "label"], range_y=0.2, prob=0.3, mode=["bilinear", "nearest"]),
