@@ -1,3 +1,4 @@
+import copy
 from pathlib import Path
 from typing import Any, Tuple, Union
 
@@ -48,16 +49,21 @@ def get_datasets(
 
     indices = list(range(total_samples))
     train_indices = indices[:train_size]
-    val_indices = indices[train_size:total_samples]
+    val_indices = indices[train_size: total_samples]
 
     train_dataset = torch.utils.data.Subset(full_dataset, train_indices)
-    val_dataset = torch.utils.data.Subset(full_dataset, val_indices)
+    val_dataset = torch.utils.data.Subset(copy.deepcopy(full_dataset), val_indices)
 
     train_dataset.dataset.transform = train_transforms
     train_dataset.dataset.target_transform = train_transforms
 
     val_dataset.dataset.transform = val_transforms
     val_dataset.dataset.target_transform = val_transforms
+
+    print("Applied transforms:")
+    print(train_dataset.dataset.transform)
+    print(val_dataset.dataset.transform)
+    print("-------------------------")
 
     if val_size <= 0:
         print(
@@ -68,7 +74,26 @@ def get_datasets(
     print(
         f"Training samples: {len(train_dataset)}, Validation samples: {len(val_dataset)}"
     )
+
+    train_ids = get_sample_ids(train_dataset)
+    val_ids = get_sample_ids(val_dataset)
+
+    overlap = set(train_ids) & set(val_ids)
+
+    print(f"\nTrain unique samples: {len(set(train_ids))}")
+    print(f"Val unique samples:   {len(set(val_ids))}")
+    print(f"Overlap count:        {len(overlap)}")
+
     return train_dataset, val_dataset
+
+
+def get_sample_ids(subset):
+    ds = subset.dataset
+    indices = subset.indices
+    ids = []
+    for idx in indices:
+        ids.append(ds.file_list[idx]["image"])
+    return ids
 
 
 def create_dataloaders(

@@ -97,6 +97,9 @@ class BrainTumorDataset(Dataset):
             augmented = self.transform({"image": image, "label": mask})
             image, mask = augmented["image"], augmented["label"]
 
+        if mask is not None:
+            mask = mask.to(torch.int64)
+
         return image, mask
 
     def _load_and_cache_item(
