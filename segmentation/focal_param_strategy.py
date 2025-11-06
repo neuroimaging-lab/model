@@ -16,12 +16,12 @@ class FocalParamStrategy:
         class_proportions: Dict[str, float],
         metric_saver: MetricSaver,
         gamma: float = 2.0,
-        explicite_alpha: Optional[float] = None,
+        explicit_alpha: Optional[float] = None,
         strategy: Literal["inverse", "inverse_sqrt", "log_scaling"] = "inverse_sqrt",
     ):
         """
-        Calculates alpha values based on the provided strategy and class proportions if no explicite alpha provided.
-        If explicite alpha provided, uses explicite_alpha for the foreground and 1-explicite_alpha for the background
+        Calculates alpha values based on the provided strategy and class proportions if no explicit alpha provided.
+        If explicit alpha provided, uses explicit_alpha for the foreground and 1-explicit_alpha for the background
         Saves the parameters to a text file.
         """
         self._class_proportions: Dict[str, float] = class_proportions
@@ -31,12 +31,12 @@ class FocalParamStrategy:
         self.alpha: list[float]
         self.strategy: str
 
-        if explicite_alpha is not None:
+        if explicit_alpha is not None:
             self.alpha = [
-                1.0 - explicite_alpha,  # Background
-                explicite_alpha,  # Edema
-                explicite_alpha,  # Non-enhancing tumor
-                explicite_alpha,  # Enhancing tumour
+                1.0 - explicit_alpha,  # Background
+                explicit_alpha,  # Edema
+                explicit_alpha,  # Non-enhancing tumor
+                explicit_alpha,  # Enhancing tumour
             ]
             self.strategy = "specified_by_hand"
         else:

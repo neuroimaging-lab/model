@@ -146,7 +146,7 @@ class Trainer:
                 class_distribution.proportions,
                 self.metric_saver,
                 gamma,
-                explicite_alpha=alpha,
+                explicit_alpha=alpha,
             )
         else:
             self.focal_param_strategy = FocalParamStrategy(
