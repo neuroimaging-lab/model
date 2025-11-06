@@ -1,12 +1,13 @@
+import copy
 from pathlib import Path
-from typing import Any, Tuple, Union
+from typing import Any, Tuple, Union, cast
 
 import torch
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset as TorchSubset
 
 from segmentation.config import CLUSTER_TRAINING_ENABLED
 from segmentation.dataset import BrainTumorDataset
-from segmentation.transforms import train_transforms
+from segmentation.transforms import train_transforms, val_transforms
 from util.image_manipulation import cut_images_and_masks
 
 
@@ -29,8 +30,6 @@ def get_datasets(
         root_dir=str(root_dir),
         split="train",
         modalities=["FLAIR", "T1w", "t1gd", "T2w"],
-        transform=train_transforms,
-        target_transform=train_transforms,
         cache_data=False,
     )
 
@@ -48,22 +47,56 @@ def get_datasets(
     val_size = max(1, val_size) if total_samples > 1 else 0
     train_size = total_samples - val_size
 
-    train_dataset = torch.utils.data.Subset(final_dataset, range(train_size))
+    indices = list(range(total_samples))
+    train_indices = indices[:train_size]
+    val_indices = indices[train_size:total_samples]
+
+    train_dataset = torch.utils.data.Subset(full_dataset, train_indices)
+    val_dataset = torch.utils.data.Subset(copy.deepcopy(full_dataset), val_indices)
+
+    train_inner = cast(BrainTumorDataset, train_dataset.dataset)
+    val_inner = cast(BrainTumorDataset, val_dataset.dataset)
+
+    train_inner.transform = train_transforms
+    train_inner.target_transform = train_transforms
+
+    val_inner.transform = val_transforms
+    val_inner.target_transform = val_transforms
+
+    print("Applied transforms:")
+    print(train_inner.transform)
+    print(val_inner.transform)
+    print("-------------------------")
 
     if val_size <= 0:
         print(
             "No validation samples available, using the same as for the training."
         )  # It is strictly for overfitting check on 1 sample
         val_dataset = train_dataset
-    else:
-        val_dataset = torch.utils.data.Subset(
-            final_dataset, range(train_size, max_total_samples)
-        )
 
     print(
         f"Training samples: {len(train_dataset)}, Validation samples: {len(val_dataset)}"
     )
+
+    train_ids = get_sample_ids(train_dataset)
+    val_ids = get_sample_ids(val_dataset)
+
+    overlap = set(train_ids) & set(val_ids)
+
+    print(f"\nTrain unique samples: {len(set(train_ids))}")
+    print(f"Val unique samples:   {len(set(val_ids))}")
+    print(f"Overlap count:        {len(overlap)}")
+
     return train_dataset, val_dataset
+
+
+def get_sample_ids(subset: TorchSubset[BrainTumorDataset]) -> list[str]:
+    ds = cast(BrainTumorDataset, subset.dataset)
+    indices = subset.indices
+    ids = []
+    for idx in indices:
+        ids.append(ds.file_list[idx]["image"])
+    return ids
 
 
 def create_dataloaders(
