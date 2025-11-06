@@ -54,14 +54,14 @@ def test_train_transforms(
 
 
 image_path = (
-    Path(__file__).parent.parent.parent
+    Path(__file__).parent.parent
     / "datasets"
     / "Task01_BrainTumour"
     / "imagesTr"
     / "BRATS_001.nii.gz"
 )
 label_path = (
-    Path(__file__).parent.parent.parent
+    Path(__file__).parent.parent
     / "datasets"
     / "Task01_BrainTumour"
     / "labelsTr"
