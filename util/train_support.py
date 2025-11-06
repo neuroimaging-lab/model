@@ -1,6 +1,6 @@
 import copy
 from pathlib import Path
-from typing import Any, Tuple, Union
+from typing import Any, Tuple, Union, cast
 
 import torch
 from torch.utils.data import DataLoader
@@ -54,15 +54,18 @@ def get_datasets(
     train_dataset = torch.utils.data.Subset(full_dataset, train_indices)
     val_dataset = torch.utils.data.Subset(copy.deepcopy(full_dataset), val_indices)
 
-    train_dataset.dataset.transform = train_transforms
-    train_dataset.dataset.target_transform = train_transforms
+    train_inner = cast(BrainTumorDataset, train_dataset.dataset)
+    val_inner = cast(BrainTumorDataset, val_dataset.dataset)
 
-    val_dataset.dataset.transform = val_transforms
-    val_dataset.dataset.target_transform = val_transforms
+    train_inner.transform = train_transforms
+    train_inner.target_transform = train_transforms
+
+    val_inner.transform = val_transforms
+    val_inner.target_transform = val_transforms
 
     print("Applied transforms:")
-    print(train_dataset.dataset.transform)
-    print(val_dataset.dataset.transform)
+    print(train_inner.transform)
+    print(val_inner.transform)
     print("-------------------------")
 
     if val_size <= 0:
