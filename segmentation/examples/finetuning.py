@@ -3,8 +3,8 @@ import subprocess
 
 
 def fine_tune():
-    #gamma: list[float] = [2.0, 3.0, 4.0, 5.0]
-    #alpha: list[float] = [0.5, 0.75, 0.9, 0.99]
+    # gamma: list[float] = [2.0, 3.0, 4.0, 5.0]
+    # alpha: list[float] = [0.5, 0.75, 0.9, 0.99]
     gamma: list[float] = [2.0]
     alpha: list[float] = [0.5]
     learning_rate: list[float] = [5e-5, 1e-4, 2e-4, 3e-4, 1e-3]

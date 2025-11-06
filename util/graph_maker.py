@@ -2,7 +2,7 @@ import ast
 import csv
 import os
 import random
-from typing import Optional
+from typing import Literal, Optional
 
 from matplotlib.colors import ListedColormap
 import matplotlib.pyplot as plt
@@ -20,15 +20,23 @@ class GraphMaker:
         self.target_slice = None
 
         self.slices_dir_path = f"{METRICS_DIR}slices/"
+        self.slices_train_path = self.slices_dir_path + "train/"
+        self.slices_val_path = self.slices_dir_path + "val/"
+
         self.slice_idx = None
         self.metrics_path: str = METRICS_DIR + "metrics.csv"
 
+        max_distance_in_mri = (160**2 + 240**2 + 240**2) ** 0.5
+        self.INF_PLOT_REPRESENTATION = int(max_distance_in_mri)
+
         os.makedirs(self.slices_dir_path)
+        os.makedirs(self.slices_train_path)
+        os.makedirs(self.slices_val_path)
 
     def _find_slice_idx_with_all_classes(
         self, target_labels: torch.Tensor
     ) -> Optional[int]:
-        random.seed(42)
+        random.seed(1)
 
         target_labels = target_labels.squeeze(1)  # [B, D, H, W]
         num_slices = target_labels.shape[1]
@@ -69,11 +77,21 @@ class GraphMaker:
             target_labels[0, self.slice_idx, :, :].cpu().detach().numpy()
         )
 
-    def save_slice(self, epoch: int, dice_score: float):
-        slice_path = self.slices_dir_path + f"slice_{epoch}.png"
-        fig = self._create_slice_figure(epoch, dice_score)
-        fig.savefig(slice_path)
-        plt.close(fig)
+    def save_slice(
+        self,
+        epoch: int,
+        dice_score: float,
+        to: Literal["train", "val"],
+        save_every_which_epoch: int = 5,
+    ):
+        if epoch % save_every_which_epoch == 0:
+            slice_folder_path = (
+                self.slices_train_path if to == "train" else self.slices_val_path
+            )
+            slice_path = f"{slice_folder_path}slice_{epoch}.png"
+            fig = self._create_slice_figure(epoch, dice_score)
+            fig.savefig(slice_path)
+            plt.close(fig)
 
     def _create_slice_figure(self, epoch: int, dice_score: float):
         colors = ["darkviolet", "blue", "green", "yellow"]
@@ -103,23 +121,37 @@ class GraphMaker:
     def make_summary_of_results(
         self,
         epochs: int,
-        slice_file: str = "summary.png",
         dice_plot_file: str = "dice_plot.png",
         dice_per_class_file: str = "dice_per_class_plot.png",
+        hausdorff_plot_file: str = "hausdorff_plot.png",
+        hausdorff_per_class_file: str = "hausdorff_per_class_plot.png",
     ):
-        plot = self._make_dice_summary_plot()
-        plot.savefig(os.path.join(METRICS_DIR, dice_plot_file))
+        plot_dice = self._make_summary_plot("Dice")
+        plot_dice.savefig(os.path.join(METRICS_DIR, dice_plot_file))
 
-        plot_2 = self._make_dice_per_class_summary_plot()
-        plot_2.savefig(os.path.join(METRICS_DIR, dice_per_class_file))
+        plot_dice_per_class = self._make_per_class_summary_plot("Dice")
+        plot_dice_per_class.savefig(os.path.join(METRICS_DIR, dice_per_class_file))
 
-        summary_img = self._prepare_slice_summary_image(epochs)
-        summary_img.save(os.path.join(METRICS_DIR, slice_file))
+        summary_train_img = self._prepare_slice_summary_image(epochs, to="train")
+        summary_train_img.save(os.path.join(METRICS_DIR, "summary_train.png"))
 
-    def _prepare_slice_summary_image(self, epochs, step: int = 20, grid_cols: int = 2):
+        summary_val_img = self._prepare_slice_summary_image(epochs, to="val")
+        summary_val_img.save(os.path.join(METRICS_DIR, "summary_val.png"))
+
+        plot_hausdorff = self._make_summary_plot("Hausdorff")
+        plot_hausdorff.savefig(os.path.join(METRICS_DIR, hausdorff_plot_file))
+
+        plot_hausdorff_per_class = self._make_per_class_summary_plot("Hausdorff")
+        plot_hausdorff_per_class.savefig(
+            os.path.join(METRICS_DIR, hausdorff_per_class_file)
+        )
+
+    def _prepare_slice_summary_image(
+        self, epochs, to: Literal["train", "val"], step: int = 20, grid_cols: int = 2
+    ):
+        dir_path = self.slices_train_path if to == "train" else self.slices_val_path
         image_paths = [
-            os.path.join(self.slices_dir_path, f"slice_{i}.png")
-            for i in range(0, epochs + 1, step)
+            os.path.join(dir_path, f"slice_{i}.png") for i in range(0, epochs + 1, step)
         ]
 
         images = [Image.open(path) for path in image_paths if os.path.exists(path)]
@@ -144,35 +176,48 @@ class GraphMaker:
 
         return summary_img
 
-    def _make_dice_summary_plot(self):
+    def _make_summary_plot(self, metric: Literal["Dice", "Hausdorff"]):
         data = np.genfromtxt(self.metrics_path, delimiter=";", skip_header=1)
 
         epochs = data[:, 0]
-        train_dice = data[:, 1]
-        val_dice = data[:, 2]
+        if metric == "Dice":
+            train_avg = data[:, 1]
+            val_avg = data[:, 2]
+        elif metric == "Hausdorff":
+            train_avg = data[:, 5]
+            train_avg = np.where(
+                np.isinf(train_avg), self.INF_PLOT_REPRESENTATION, train_avg
+            )
+            val_avg = data[:, 6]
+            val_avg = np.where(np.isinf(val_avg), self.INF_PLOT_REPRESENTATION, val_avg)
 
         fig, ax = plt.subplots(figsize=(8, 6))
         ax.plot(
             epochs,
-            train_dice,
-            label="Train Dice",
+            train_avg,
+            label=f"Train {metric}",
             color="blue",
             linewidth=2,
             marker="o",
         )
         ax.plot(
             epochs,
-            val_dice,
-            label="Validation Dice",
+            val_avg,
+            label=f"Validation {metric}",
             color="orange",
             linewidth=2,
             marker="s",
         )
 
-        ax.set_title("Dice Score Over Epochs", fontsize=14, fontweight="bold")
+        ax.set_title(f"{metric} Over Epochs", fontsize=14, fontweight="bold")
         ax.set_xlabel("Epoch", fontsize=12)
-        ax.set_ylabel("Dice Score", fontsize=12)
-        ax.set_ylim(0, 1)
+        ax.set_ylabel(
+            f"{metric} {'Score' if metric == 'Dice' else 'Distance'}", fontsize=12
+        )
+        if metric == "Dice":
+            ax.set_ylim(0, 1)
+        else:
+            ax.set_ylim(0, self.INF_PLOT_REPRESENTATION)
 
         min_epoch, max_epoch, step = self._get_epochs_info(epochs)
         ax.set_xlim(min_epoch, max_epoch + 0.5)
@@ -186,56 +231,77 @@ class GraphMaker:
 
         return fig
 
-    def _make_dice_per_class_summary_plot(self):
+    def _make_per_class_summary_plot(self, metric: Literal["Dice", "Hausdorff"]):
         epochs = []
-        train_per_class_dice = []
-        val_per_class_dice = []
+        train_per_class = []
+        val_per_class = []
 
         with open(self.metrics_path, encoding="utf-8") as f:
             reader = csv.reader(f, delimiter=";")
             next(reader)
-            for row in reader:
-                epochs.append(int(row[0]))
-                train_per_class_dice.append(ast.literal_eval(row[3]))
-                val_per_class_dice.append(ast.literal_eval(row[4]))
+            for data_row in reader:
+                epochs.append(int(data_row[0]))
+                if metric == "Dice":
+                    train_per_class.append(ast.literal_eval(data_row[3]))
+                    val_per_class.append(ast.literal_eval(data_row[4]))
+                elif metric == "Hausdorff":
+                    train_vals = ast.literal_eval(
+                        data_row[7].replace("inf", str(self.INF_PLOT_REPRESENTATION))
+                    )
+                    val_vals = ast.literal_eval(
+                        data_row[8].replace("inf", str(self.INF_PLOT_REPRESENTATION))
+                    )
+                    train_per_class.append(train_vals)
+                    val_per_class.append(val_vals)
 
-        epochs = np.array(epochs)
-        train_per_class_dice = np.array(train_per_class_dice)
-        val_per_class_dice = np.array(val_per_class_dice)
+        epochs_arr = np.array(epochs)
+        train_per_class_arr = np.array(train_per_class)
+        val_per_class_arr = np.array(val_per_class)
 
-        num_classes = len(DATA_LABELS)
-        fig, axes = plt.subplots(2, 2, figsize=(10, 8))
+        if metric == "Dice":
+            num_classes = len(DATA_LABELS)
+            row, col = (2, 2)
+        elif metric == "Hausdorff":
+            num_classes = len(DATA_LABELS) - 1
+            row, col = (num_classes, 1)
+
+        fig, axes = plt.subplots(row, col, figsize=(10, 8 if metric == "Dice" else 12))
         axes = axes.flatten()
 
         for i in range(num_classes):
             ax = axes[i]
 
             ax.plot(
-                epochs,
-                train_per_class_dice[:, i],
-                label="Train Dice",
+                epochs_arr,
+                train_per_class_arr[:, i],
+                label=f"Train {metric}",
                 color="blue",
                 linewidth=2,
                 marker="o",
             )
             ax.plot(
-                epochs,
-                val_per_class_dice[:, i],
-                label="Validation Dice",
+                epochs_arr,
+                val_per_class_arr[:, i],
+                label=f"Validation {metric}",
                 color="orange",
                 linewidth=2,
                 marker="s",
             )
-
-            ax.set_title(f"{DATA_LABELS[i]}", fontsize=12, fontweight="bold")
+            class_idx = i if metric == "Dice" else i + 1
+            ax.set_title(f"{DATA_LABELS[class_idx]}", fontsize=12, fontweight="bold")
             ax.set_xlabel("Epoch", fontsize=10)
-            ax.set_ylabel("Dice Score", fontsize=10)
-            ax.set_ylim(0, 1)
+            ax.set_ylabel(
+                f"{metric} {'Score' if metric == 'Dice' else 'Distance'}", fontsize=10
+            )
+            if metric == "Dice":
+                ax.set_ylim(0, 1)
+            else:
+                ax.set_ylim(0, self.INF_PLOT_REPRESENTATION)
             ax.grid(True, linestyle="--", alpha=0.6)
             ax.legend(fontsize=9, loc="lower right")
 
         plt.suptitle(
-            "Per-Class Dice Coefficient During Training and Validation",
+            f"Per-Class {metric} {'Score' if metric == 'Dice' else 'Distance'} During Training and Validation",
             fontsize=14,
             fontweight="bold",
         )

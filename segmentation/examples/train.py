@@ -29,8 +29,8 @@ def example_train(
             bottleneck_channels=512,
         )
 
-    optimizer = torch.optim.AdamW(model.parameters(), lr = lr if lr else 3e-4)
-    
+    optimizer = torch.optim.AdamW(model.parameters(), lr=lr if lr else 3e-4)
+
     trainer = Trainer(
         model=model,
         optimizer=optimizer,
@@ -63,7 +63,12 @@ def parse_args() -> tuple[Optional[float], Optional[float], Optional[float], boo
 
     try:
         args = parser.parse_args()
-        return args.gamma[0], args.alpha[0], args.lr[0], args.store_checkpoints_in_temp_storage
+        return (
+            args.gamma[0],
+            args.alpha[0],
+            args.lr[0],
+            args.store_checkpoints_in_temp_storage,
+        )
     except Exception:
         return None, None, None, False
 

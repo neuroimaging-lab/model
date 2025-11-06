@@ -33,10 +33,10 @@ class FocalParamStrategy:
 
         if explicite_alpha is not None:
             self.alpha = [
-                1.0 - explicite_alpha,
-                explicite_alpha,
-                explicite_alpha,
-                explicite_alpha,
+                1.0 - explicite_alpha,  # Background
+                explicite_alpha,  # Edema
+                explicite_alpha,  # Non-enhancing tumor
+                explicite_alpha,  # Enhancing tumour
             ]
             self.strategy = "specified_by_hand"
         else:
