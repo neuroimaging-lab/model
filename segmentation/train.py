@@ -264,7 +264,7 @@ class Trainer:
         hausdorff_per_class: List[torch.Tensor] = []
 
         with tqdm(dataloader, desc="Training") as progress:
-            for _, (images, masks) in enumerate(progress):
+            for i, (images, masks) in enumerate(progress):
                 images, masks = prepare_images_and_masks(images, masks, device)
 
                 self.optimizer.zero_grad(set_to_none=True)
@@ -281,7 +281,10 @@ class Trainer:
                     hausdorff_per_class.append(hausdorff_metric)
                     epoch_loss += loss.item()
 
-                self.graph_maker.set_prediction_and_ground_truth_slice(outputs, masks)
+                if i == 0:
+                    self.graph_maker.set_prediction_and_ground_truth_slice(
+                        outputs, masks
+                    )
 
         mean_per_class_dices: list = (
             torch.stack(dice_scores_per_class).mean(dim=0).cpu().numpy().tolist()
@@ -309,7 +312,7 @@ class Trainer:
 
         with torch.no_grad():
             with tqdm(dataloader, desc="Validation") as progress:
-                for _, (images, masks) in enumerate(progress):
+                for i, (images, masks) in enumerate(progress):
                     images, masks = prepare_images_and_masks(images, masks, device)
 
                     outputs = self.model(images)
@@ -321,9 +324,10 @@ class Trainer:
                     dice_scores_per_class.append(dice_per_class)
                     hausdorff_per_class.append(hausdorff_metric)
 
-                    self.graph_maker.set_prediction_and_ground_truth_slice(
-                        outputs, masks
-                    )
+                    if i == 0:
+                        self.graph_maker.set_prediction_and_ground_truth_slice(
+                            outputs, masks
+                        )
 
         mean_per_class_dices: list = (
             torch.stack(dice_scores_per_class).mean(dim=0).cpu().numpy().tolist()

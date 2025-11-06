@@ -29,7 +29,7 @@ def example_train(
             bottleneck_channels=512,
         )
 
-    optimizer = torch.optim.AdamW(model.parameters(), lr=lr if lr else 3e-4)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=lr if lr else 5e-5)
 
     trainer = Trainer(
         model=model,
@@ -42,8 +42,8 @@ def example_train(
 
     trainer.train(
         dataset_dir=DATASET_DIR,
-        total_samples=5,
-        epochs=2,
+        total_samples=20,
+        epochs=10,
         device=device,
         gamma=gamma,
         alpha=alpha,
