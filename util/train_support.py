@@ -49,7 +49,7 @@ def get_datasets(
 
     indices = list(range(total_samples))
     train_indices = indices[:train_size]
-    val_indices = indices[train_size: total_samples]
+    val_indices = indices[train_size:total_samples]
 
     train_dataset = torch.utils.data.Subset(full_dataset, train_indices)
     val_dataset = torch.utils.data.Subset(copy.deepcopy(full_dataset), val_indices)

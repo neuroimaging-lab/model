@@ -95,10 +95,10 @@ class BrainTumorDataset(Dataset):
 
         if self.transform is not None:
             augmented = self.transform({"image": image, "label": mask})
+            # Some MONAI dict transforms return a list of samples even when num_samples=1, unwrap to a single dict
+            if isinstance(augmented, list):
+                augmented = augmented[0]
             image, mask = augmented["image"], augmented["label"]
-
-        if mask is not None:
-            mask = mask.to(torch.int64)
 
         return image, mask
 
