@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Any, Tuple, Union, cast
 
 import torch
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset as TorchSubset
 
 from segmentation.config import CLUSTER_TRAINING_ENABLED
 from segmentation.dataset import BrainTumorDataset
@@ -90,7 +90,7 @@ def get_datasets(
     return train_dataset, val_dataset
 
 
-def get_sample_ids(subset: BrainTumorDataset) -> list[str]:
+def get_sample_ids(subset: TorchSubset[BrainTumorDataset]) -> list[str]:
     ds = subset.dataset
     indices = subset.indices
     ids = []
