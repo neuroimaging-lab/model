@@ -90,7 +90,7 @@ def get_datasets(
     return train_dataset, val_dataset
 
 
-def get_sample_ids(subset):
+def get_sample_ids(subset) -> list[str]:
     ds = subset.dataset
     indices = subset.indices
     ids = []
