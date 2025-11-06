@@ -91,7 +91,7 @@ def get_datasets(
 
 
 def get_sample_ids(subset: TorchSubset[BrainTumorDataset]) -> list[str]:
-    ds = subset.dataset
+    ds = cast(BrainTumorDataset, subset.dataset)
     indices = subset.indices
     ids = []
     for idx in indices:
