@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import timedelta
+from math import ceil, hypot
 from pathlib import Path
 import time
 from typing import Any, Dict, List, Optional, Tuple
@@ -226,6 +227,7 @@ class Trainer:
         self,
         logits: torch.Tensor,  # (B, C, D, H, W)
         target: torch.Tensor,  # (B, 1, D, H, W)
+        inf_representation: float = ceil(hypot(160, 240, 240)),
     ) -> torch.Tensor:
         """
         Calculates Hausdorff distance per class for 3D predictions, skipping class 0 (background)
@@ -246,10 +248,12 @@ class Trainer:
                 idx = cls - 1
                 pred_mask = (preds[batch] == cls).cpu().numpy().astype(bool)
                 tgt_mask = (tgt[batch] == cls).cpu().numpy().astype(bool)
+
                 distance = hausdorff_distance(pred_mask, tgt_mask)
-                hausdorff_per_class[batch, idx] = (
-                    float(distance) if distance is not None else float("inf")
-                )
+                distance = distance if distance is not None else inf_representation
+                distance = min(distance, inf_representation)
+
+                hausdorff_per_class[batch, idx] = distance
 
         return hausdorff_per_class.mean(dim=0)
 

@@ -185,11 +185,7 @@ class GraphMaker:
             val_avg = data[:, 2]
         elif metric == "Hausdorff":
             train_avg = data[:, 5]
-            train_avg = np.where(
-                np.isinf(train_avg), self.INF_PLOT_REPRESENTATION, train_avg
-            )
             val_avg = data[:, 6]
-            val_avg = np.where(np.isinf(val_avg), self.INF_PLOT_REPRESENTATION, val_avg)
 
         fig, ax = plt.subplots(figsize=(8, 6))
         ax.plot(
@@ -245,12 +241,8 @@ class GraphMaker:
                     train_per_class.append(ast.literal_eval(data_row[3]))
                     val_per_class.append(ast.literal_eval(data_row[4]))
                 elif metric == "Hausdorff":
-                    train_vals = ast.literal_eval(
-                        data_row[7].replace("inf", str(self.INF_PLOT_REPRESENTATION))
-                    )
-                    val_vals = ast.literal_eval(
-                        data_row[8].replace("inf", str(self.INF_PLOT_REPRESENTATION))
-                    )
+                    train_vals = ast.literal_eval(data_row[7])
+                    val_vals = ast.literal_eval(data_row[8])
                     train_per_class.append(train_vals)
                     val_per_class.append(val_vals)
 
