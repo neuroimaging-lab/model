@@ -24,8 +24,8 @@ train_transforms = Compose(
         # Ensure the cropped volume is at least (128, 128, 128) patch size
         SpatialPadd(keys=["image", "label"], spatial_size=(128, 128, 128)),
         # Randomly pick one (128, 128, 128) patch (num_samples=1)
-        #   pos: patch center is drawn from vocels with positive labels
-        #   neg: patch center is drawn from vocels with zeros
+        #   pos: patch center is drawn from voxels with positive labels
+        #   neg: patch center is drawn from voxels with zeros
         #   for pos=1 and neg=1, half patches will have tumor, half will be random
         RandCropByPosNegLabeld(
             keys=["image", "label"],
