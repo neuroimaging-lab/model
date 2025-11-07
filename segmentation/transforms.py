@@ -67,10 +67,6 @@ val_transforms = Compose(
     [
         # Same standardization as in training
         NormalizeIntensityd(keys=["image"], nonzero=True, channel_wise=True),
-        # Same cropping as in training
-        CropForegroundd(keys=["image", "label"], source_key="image"),
-        # Same minimum size padding as in training
-        SpatialPadd(keys=["image", "label"], spatial_size=(128, 128, 128)),
         # Guarantee label tensor dtype for losses/metrics
         CastToTyped(keys=["label"], dtype=torch.int64),
         # Pad to multiples of 16 (UNet down/upsampling compatibility)
