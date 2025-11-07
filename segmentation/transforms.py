@@ -52,7 +52,7 @@ train_transforms = Compose(
         ),
         # Random intensity augmentations
         RandBiasFieldd(keys=["image"], prob=0.3, coeff_range=(0.0, 0.05)),
-        # Ramdom intensity shift
+        # Random intensity shift
         RandShiftIntensityd(keys=["image"], offsets=0.1, prob=0.2),
         # Random Gaussian noise, it improves robustness to noisy images
         RandGaussianNoised(keys=["image"], prob=0.15, std=0.01),
