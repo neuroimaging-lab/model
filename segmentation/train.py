@@ -40,11 +40,11 @@ class Trainer:
         self,
         model: torch.nn.Module,
         optimizer: torch.optim.Optimizer,
-        *, #TODO: remove this separator
+        *,
         batch_size: int = 1,
         val_split: float = 0.2,
         save_dir: Path | str = "checkpoints",
-        num_workers: int = 2,
+        num_workers: int = 4,
         pin_memory: bool = True,
         store_checkpoints_in_temp_storage: bool = False,
     ):
@@ -69,8 +69,8 @@ class Trainer:
     def train(
         self,
         dataset_dir: Path,
-        total_samples: int = -1, #TODO: -1 no longer working
-        epochs: int = 5, #TODO: remove default
+        total_samples: int = -1,
+        epochs: int = 10,
         device: str = "cpu",
         gamma: Optional[float] = None,
         alpha: Optional[float] = None,
@@ -178,7 +178,7 @@ class Trainer:
         params: FocalParamStrategy,  # Contains alpha, gamma and epsilon
     ) -> torch.Tensor:
         """
-        Multi-class Focal Loss for imbalanced datasets. Source: https://arxiv.org/pdf/1708.02002 #TODO: change `Source` to `Based on`
+        Multi-class Focal Loss for imbalanced datasets, based on https://arxiv.org/pdf/1708.02002
         """
         probs = F.softmax(logits, dim=1)  # (B, C, D, H, W)
         c = probs.shape[1]
@@ -263,7 +263,7 @@ class Trainer:
         device: str,
     ) -> Tuple[float, list[float], list[float]]:
         self.model.train()
-        epoch_loss: float = 0.0
+        epoch_loss_acc: float = 0.0
         dice_scores_per_class: List[torch.Tensor] = []
         hausdorff_per_class: List[torch.Tensor] = []
 
@@ -283,19 +283,12 @@ class Trainer:
 
                     dice_scores_per_class.append(dice_per_class)
                     hausdorff_per_class.append(hausdorff_metric)
-                    epoch_loss += loss.item()
+                    epoch_loss_acc += loss.item()
 
                 if i == 0:
                     self.graph_maker.set_prediction_and_ground_truth_slice(
                         outputs, masks
                     )
-
-                progress.set_postfix( #TODO: not needed, to be removed
-                    {
-                        "loss": f"{loss.item():.4f}",
-                        "dice": f"{dice_per_class.mean().item():.4f}",
-                    }
-                )
 
         mean_per_class_dices: list = (
             torch.stack(dice_scores_per_class).mean(dim=0).cpu().numpy().tolist()
@@ -306,7 +299,7 @@ class Trainer:
         )
 
         return (
-            epoch_loss / max(1, len(dataloader)),
+            epoch_loss_acc / max(1, len(dataloader)),
             mean_per_class_dices,
             mean_per_class_hausdorff,
         )
@@ -317,7 +310,7 @@ class Trainer:
         device: str,
     ) -> Tuple[float, list[float], list[float]]:
         self.model.eval()
-        val_loss: float = 0.0 #TODO: change to val_loss_acc
+        val_loss_acc: float = 0.0
         dice_scores_per_class: List[torch.Tensor] = []
         hausdorff_per_class: List[torch.Tensor] = []
 
@@ -328,7 +321,7 @@ class Trainer:
 
                     outputs = self.model(images)
                     loss = self._focal_loss(outputs, masks, self.focal_param_strategy)
-                    val_loss += loss.item()
+                    val_loss_acc += loss.item()
 
                     dice_per_class = self._dice_coefficient_per_class(outputs, masks)
                     hausdorff_metric = self._hausdorff_metric(outputs, masks)
@@ -340,13 +333,6 @@ class Trainer:
                             outputs, masks
                         )
 
-                    progress.set_postfix( #TODO: not needed, to be removed
-                        {
-                            "val_loss": f"{loss.item():.4f}",
-                            "val_dice": f"{dice_per_class.mean().item():.4f}",
-                        }
-                    )
-
         mean_per_class_dices: list = (
             torch.stack(dice_scores_per_class).mean(dim=0).cpu().numpy().tolist()
         )
@@ -356,7 +342,7 @@ class Trainer:
         )
 
         return (
-            val_loss / max(1, len(dataloader)),
+            val_loss_acc / max(1, len(dataloader)),
             mean_per_class_dices,
             mean_per_class_hausdorff,
         )
