@@ -21,7 +21,7 @@ def get_datasets(
 
     Args:
         root_dir: The root directory of the dataset.
-        total_samples: The total number of samples to use (-1 for all).
+        total_samples: The total number of samples to use (-1 for all). #TODO: -1 not used anymore???
 
     Returns:
         Tuple containing the training and validation datasets.
@@ -29,11 +29,11 @@ def get_datasets(
     full_dataset = BrainTumorDataset(
         root_dir=str(root_dir),
         split="train",
-        modalities=["FLAIR", "T1w", "t1gd", "T2w"],
-        cache_data=False,
+        modalities=["FLAIR", "T1w", "t1gd", "T2w"], #TODO: those modalities are default, no need to specify here
+        cache_data=False, #TODO: same as above
     )
 
-    final_dataset: Union[BrainTumorDataset, torch.utils.data.Subset[Any]]
+    final_dataset: Union[BrainTumorDataset, torch.utils.data.Subset[Any]] #TODO: final_dataset is no longer used
 
     if max_total_samples > 0 and max_total_samples < len(full_dataset):
         final_dataset = torch.utils.data.Subset(full_dataset, range(max_total_samples))
@@ -100,7 +100,7 @@ def get_sample_ids(subset: TorchSubset[BrainTumorDataset]) -> list[str]:
 
 
 def create_dataloaders(
-    data_config, root_dir: Path, max_total_samples: int
+    data_config, root_dir: Path, max_total_samples: int #TODO: add type hint for data_config
 ) -> Tuple[DataLoader, DataLoader]:
     """Create data loaders for training and validation datasets to use during training."""
 
@@ -114,7 +114,7 @@ def create_dataloaders(
         shuffle=True,
         num_workers=data_config["num_workers"],
         persistent_workers=True,
-        pin_memory=data_config["pin_memory"],
+        pin_memory=data_config["pin_memory"], #TODO: figure out those num_workers, persistent_workers, pin_memory settings
     )  # We are shuffling the training data for better generalization
 
     val_loader = DataLoader(
@@ -123,7 +123,7 @@ def create_dataloaders(
         shuffle=False,
         num_workers=data_config["num_workers"],
         persistent_workers=True,
-        pin_memory=data_config["pin_memory"],
+        pin_memory=data_config["pin_memory"], #TODO: figure out those num_workers, persistent_workers, pin_memory settings
     )
 
     # The num_workers and pin_memory arguments are used to speed up data loading,
@@ -153,7 +153,7 @@ def save_model(
     )
 
 
-def ensure_class_indices(target: torch.Tensor, num_classes: int) -> torch.Tensor:
+def ensure_class_indices(target: torch.Tensor, num_classes: int) -> torch.Tensor: #TODO: this method is no longer used, can be deleted as a whole
     """
     Ensure target is class indices tensor of shape (B, 1, D, H, W), dtype long.
     Accepts:
@@ -184,10 +184,10 @@ def prepare_images_and_masks(
     if not CLUSTER_TRAINING_ENABLED:
         images, masks = cut_images_and_masks(images, masks)
 
-    images = images.to(device, non_blocking=True)
-    masks = masks.to(device, non_blocking=True)
+    images = images.to(device, non_blocking=True) #TODO: why non_blocking=True?
+    masks = masks.to(device, non_blocking=True) #TODO: why non_blocking=True?
 
-    masks = ensure_class_indices(
+    masks = ensure_class_indices( #TODO: remove with the method no longer used
         masks,
         num_classes=images.shape[1],
     )

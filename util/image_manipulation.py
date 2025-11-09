@@ -1,7 +1,7 @@
 import torch
 
 
-def cut_images_and_masks(
+def cut_images_and_masks( #TODO: move to train_support.py and remove this file
     images: torch.Tensor, masks: torch.Tensor
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """

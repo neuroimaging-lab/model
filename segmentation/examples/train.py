@@ -18,8 +18,8 @@ def example_train(
         model = UNet3D(
             in_channels=4,
             num_classes=4,
-            level_channels=[64, 128, 256],
-            bottleneck_channels=512,
+            level_channels=[16, 32, 64],
+            bottleneck_channels=128,
         )
     else:
         model = UNet3D(
@@ -42,8 +42,8 @@ def example_train(
 
     trainer.train(
         dataset_dir=DATASET_DIR,
-        total_samples=20,
-        epochs=10,
+        total_samples=2,
+        epochs=1,
         device=device,
         gamma=gamma,
         alpha=alpha,

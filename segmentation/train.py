@@ -40,7 +40,7 @@ class Trainer:
         self,
         model: torch.nn.Module,
         optimizer: torch.optim.Optimizer,
-        *,
+        *, #TODO: remove this separator
         batch_size: int = 1,
         val_split: float = 0.2,
         save_dir: Path | str = "checkpoints",
@@ -51,7 +51,7 @@ class Trainer:
         self.model = model
         self.optimizer = optimizer
 
-        self.data_config: Dict[str, Any] = {
+        self.data_config: Dict[str, Any] = { #TODO: export this to a config class
             "batch_size": batch_size,
             "val_split": val_split,
             "save_dir": Path(save_dir),
@@ -69,8 +69,8 @@ class Trainer:
     def train(
         self,
         dataset_dir: Path,
-        total_samples: int = -1,
-        epochs: int = 5,
+        total_samples: int = -1, #TODO: -1 no longer working
+        epochs: int = 5, #TODO: remove default
         device: str = "cpu",
         gamma: Optional[float] = None,
         alpha: Optional[float] = None,
@@ -178,7 +178,7 @@ class Trainer:
         params: FocalParamStrategy,  # Contains alpha, gamma and epsilon
     ) -> torch.Tensor:
         """
-        Multi-class Focal Loss for imbalanced datasets. Source: https://arxiv.org/pdf/1708.02002
+        Multi-class Focal Loss for imbalanced datasets. Source: https://arxiv.org/pdf/1708.02002 #TODO: change `Source` to `Based on`
         """
         probs = F.softmax(logits, dim=1)  # (B, C, D, H, W)
         c = probs.shape[1]
@@ -268,7 +268,7 @@ class Trainer:
         hausdorff_per_class: List[torch.Tensor] = []
 
         with tqdm(dataloader, desc="Training") as progress:
-            for i, (images, masks) in enumerate(progress):
+            for i, (images, masks) in enumerate(progress): #TODO: remove this i and remove if i == 0
                 images, masks = prepare_images_and_masks(images, masks, device)
 
                 self.optimizer.zero_grad(set_to_none=True)
@@ -290,6 +290,13 @@ class Trainer:
                         outputs, masks
                     )
 
+                progress.set_postfix( #TODO: not needed, to be removed
+                    {
+                        "loss": f"{loss.item():.4f}",
+                        "dice": f"{dice_per_class.mean().item():.4f}",
+                    }
+                )
+
         mean_per_class_dices: list = (
             torch.stack(dice_scores_per_class).mean(dim=0).cpu().numpy().tolist()
         )
@@ -310,7 +317,7 @@ class Trainer:
         device: str,
     ) -> Tuple[float, list[float], list[float]]:
         self.model.eval()
-        epoch_loss: float = 0.0
+        val_loss: float = 0.0 #TODO: change to val_loss_acc
         dice_scores_per_class: List[torch.Tensor] = []
         hausdorff_per_class: List[torch.Tensor] = []
 
@@ -321,7 +328,7 @@ class Trainer:
 
                     outputs = self.model(images)
                     loss = self._focal_loss(outputs, masks, self.focal_param_strategy)
-                    epoch_loss += loss.item()
+                    val_loss += loss.item()
 
                     dice_per_class = self._dice_coefficient_per_class(outputs, masks)
                     hausdorff_metric = self._hausdorff_metric(outputs, masks)
@@ -333,6 +340,13 @@ class Trainer:
                             outputs, masks
                         )
 
+                    progress.set_postfix( #TODO: not needed, to be removed
+                        {
+                            "val_loss": f"{loss.item():.4f}",
+                            "val_dice": f"{dice_per_class.mean().item():.4f}",
+                        }
+                    )
+
         mean_per_class_dices: list = (
             torch.stack(dice_scores_per_class).mean(dim=0).cpu().numpy().tolist()
         )
@@ -342,7 +356,7 @@ class Trainer:
         )
 
         return (
-            epoch_loss / max(1, len(dataloader)),
+            val_loss / max(1, len(dataloader)),
             mean_per_class_dices,
             mean_per_class_hausdorff,
         )
