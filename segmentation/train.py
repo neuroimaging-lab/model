@@ -95,7 +95,9 @@ class Trainer:
             print(
                 f"Train Loss: {train_loss:.4f}, Train mean Dice: {train_mean_dice:.4f}, Train mean Hausdorff: {train_mean_hausdorff}"
             )
-            print(f"Train per class Hausdorf (foreground): {train_per_class_hausdorff}")
+            print(
+                f"Train per class Hausdorff (foreground): {train_per_class_hausdorff}"
+            )
             self.graph_maker.save_slice(epoch, train_mean_dice, to="train")
 
             val_loss, val_per_class_dice, val_per_class_hausdorff = self._validate(
@@ -107,7 +109,7 @@ class Trainer:
             print(
                 f"Val Loss: {val_loss:.4f}, Val mean Dice: {val_mean_dice:.4f}, Val mean Hausdorff: {val_mean_hausdorff:.4f}"
             )
-            print(f"Val per class Hausdorf (foreground): {val_per_class_hausdorff}")
+            print(f"Val per class Hausdorff (foreground): {val_per_class_hausdorff}")
             self.graph_maker.save_slice(epoch, val_mean_dice, to="val")
 
             self.metric_saver.save_entry(
