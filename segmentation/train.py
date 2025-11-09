@@ -51,7 +51,7 @@ class Trainer:
         self.model = model
         self.optimizer = optimizer
 
-        self.data_config: Dict[str, Any] = { #TODO: export this to a config class
+        self.data_config: Dict[str, Any] = {  # TODO: export this to a config class
             "batch_size": batch_size,
             "val_split": val_split,
             "save_dir": Path(save_dir),
@@ -268,7 +268,9 @@ class Trainer:
         hausdorff_per_class: List[torch.Tensor] = []
 
         with tqdm(dataloader, desc="Training") as progress:
-            for i, (images, masks) in enumerate(progress): #TODO: remove this i and remove if i == 0
+            for i, (images, masks) in enumerate(
+                progress
+            ):  # TODO: remove this i and remove if i == 0
                 images, masks = prepare_images_and_masks(images, masks, device)
 
                 self.optimizer.zero_grad(set_to_none=True)

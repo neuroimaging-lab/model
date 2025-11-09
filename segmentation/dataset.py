@@ -117,7 +117,9 @@ class BrainTumorDataset(Dataset):
         image_data = nii_img.get_fdata()  # Shape: [H, W, D, C]
 
         if len(self.modalities) > 0:
-            image_data = image_data[..., self.modalities] # Filtering to selected modalities
+            image_data = image_data[
+                ..., self.modalities
+            ]  # Filtering to selected modalities
 
         # Transpose to [C, D, H, W] format for PyTorch
         image_data = np.transpose(image_data, (3, 2, 0, 1))
