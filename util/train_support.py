@@ -93,10 +93,7 @@ def get_datasets(
 def get_sample_ids(subset: TorchSubset[BrainTumorDataset]) -> list[str]:
     ds = cast(BrainTumorDataset, subset.dataset)
     indices = subset.indices
-    ids = []
-    for idx in indices:
-        ids.append(ds.file_list[idx]["image"])
-    return ids
+    return [ds.file_list[idx]["image"] for idx in indices]
 
 
 def create_dataloaders(
