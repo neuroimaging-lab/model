@@ -19,7 +19,9 @@ class ConvBlock(nn.Module):
     Used as part of the encoder and decoder in the U-Net architecture.
     """
 
-    def __init__(self, in_channels: int, out_channels: int, dropout_rate: float = 0.0) -> None:
+    def __init__(
+        self, in_channels: int, out_channels: int, dropout_rate: float = 0.0
+    ) -> None:
         super().__init__()
         self.block = nn.Sequential(
             nn.Conv3d(
@@ -50,7 +52,9 @@ class DownBlock(nn.Module):
     Downsampling block used in the encoder part of the U-Net architecture.
     """
 
-    def __init__(self, in_channels: int, out_channels: int, dropout_rate: float = 0.0) -> None:
+    def __init__(
+        self, in_channels: int, out_channels: int, dropout_rate: float = 0.0
+    ) -> None:
         super().__init__()
         self.conv = ConvBlock(in_channels, out_channels, dropout_rate)
         self.pool = nn.MaxPool3d(kernel_size=2, stride=2)
@@ -72,7 +76,9 @@ class BottleNeck(nn.Module):
     Bottleneck block at the bottom of the U-Net.
     """
 
-    def __init__(self, in_channels: int, out_channels: int, dropout_rate: float = 0.0) -> None:
+    def __init__(
+        self, in_channels: int, out_channels: int, dropout_rate: float = 0.0
+    ) -> None:
         super().__init__()
         self.conv = ConvBlock(in_channels, out_channels)
         self.dropout = nn.Dropout3d(p=dropout_rate)
@@ -151,7 +157,9 @@ class UNet3D(nn.Module):
         self.down1 = DownBlock(in_channels, level_channels[0], dropout_rate)
         self.down2 = DownBlock(level_channels[0], level_channels[1], dropout_rate)
         self.down3 = DownBlock(level_channels[1], level_channels[2], dropout_rate)
-        self.bottleneck = BottleNeck(level_channels[2], bottleneck_channels, dropout_rate)
+        self.bottleneck = BottleNeck(
+            level_channels[2], bottleneck_channels, dropout_rate
+        )
         self.up3 = UpBlock(bottleneck_channels, level_channels[2])
         self.up2 = UpBlock(level_channels[2], level_channels[1])
         self.up1 = LastBlock(level_channels[1], level_channels[0], num_classes)

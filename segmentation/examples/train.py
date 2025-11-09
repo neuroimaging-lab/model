@@ -32,8 +32,8 @@ def example_train(
             dropout_rate=dropout_rate if dropout_rate else 0.0,
         )
 
-    optimizer = torch.optim.AdamW(model.parameters(), lr = lr if lr else 3e-4)
-    
+    optimizer = torch.optim.AdamW(model.parameters(), lr=lr if lr else 3e-4)
+
     trainer = Trainer(
         model=model,
         optimizer=optimizer,
@@ -53,12 +53,16 @@ def example_train(
     )
 
 
-def parse_args() -> tuple[Optional[float], Optional[float], Optional[float], Optional[float], bool]:
+def parse_args() -> tuple[
+    Optional[float], Optional[float], Optional[float], Optional[float], bool
+]:
     parser: ArgumentParser = ArgumentParser(description="Fine tunning runner")
     parser.add_argument("--gamma", nargs="+", type=float, help="Gamma value")
     parser.add_argument("--alpha", nargs="+", type=float, help="Alpha value")
     parser.add_argument("--lr", nargs="+", type=float, help="Learning rate value")
-    parser.add_argument("--dropout-rate", nargs="+", type=float, help="Dropout rate value")
+    parser.add_argument(
+        "--dropout-rate", nargs="+", type=float, help="Dropout rate value"
+    )
     parser.add_argument(
         "--store-checkpoints-in-temp-storage",
         action="store_true",
@@ -67,7 +71,13 @@ def parse_args() -> tuple[Optional[float], Optional[float], Optional[float], Opt
 
     try:
         args = parser.parse_args()
-        return args.gamma[0], args.alpha[0], args.lr[0], args.dropout_rate[0], args.store_checkpoints_in_temp_storage
+        return (
+            args.gamma[0],
+            args.alpha[0],
+            args.lr[0],
+            args.dropout_rate[0],
+            args.store_checkpoints_in_temp_storage,
+        )
     except Exception:
         return None, None, None, None, False
 
