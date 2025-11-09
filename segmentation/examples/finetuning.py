@@ -6,12 +6,15 @@ def fine_tune():
     gamma: list[float] = [2.0]
     alpha: list[float] = [0.75]
     learning_rate: list[float] = [5e-5]
+    dropout_rate: list[float] = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5]
 
-    param_combinations: list[tuple] = list(product(gamma, alpha, learning_rate))
+    param_combinations: list[tuple] = list(
+        product(gamma, alpha, learning_rate, dropout_rate)
+    )
 
     success_iterations: int = 0
     for i, params in enumerate(param_combinations):
-        y, a, lr = params
+        y, a, lr, dr = params
         command = [
             "uv",
             "run",
@@ -23,6 +26,8 @@ def fine_tune():
             str(a),
             "--lr",
             str(lr),
+            "--dropout-rate",
+            str(dr),
             "--store-checkpoints-in-temp-storage",
         ]
 

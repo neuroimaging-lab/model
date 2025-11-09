@@ -24,8 +24,8 @@ train_transforms = Compose(
         # Ensure the cropped volume is at least (128, 128, 128) patch size
         SpatialPadd(keys=["image", "label"], spatial_size=(128, 128, 128)),
         # Randomly pick one (128, 128, 128) patch (num_samples=1)
-        #   pos: patch center is drawn from vocels with positive labels
-        #   neg: patch center is drawn from vocels with zeros
+        #   pos: patch center is drawn from voxels with positive labels
+        #   neg: patch center is drawn from voxels with zeros
         #   for pos=1 and neg=1, half patches will have tumor, half will be random
         RandCropByPosNegLabeld(
             keys=["image", "label"],
@@ -52,7 +52,7 @@ train_transforms = Compose(
         ),
         # Random intensity augmentations
         RandBiasFieldd(keys=["image"], prob=0.3, coeff_range=(0.0, 0.05)),
-        # Ramdom intensity shift
+        # Random intensity shift
         RandShiftIntensityd(keys=["image"], offsets=0.1, prob=0.2),
         # Random Gaussian noise, it improves robustness to noisy images
         RandGaussianNoised(keys=["image"], prob=0.15, std=0.01),
@@ -67,10 +67,6 @@ val_transforms = Compose(
     [
         # Same standardization as in training
         NormalizeIntensityd(keys=["image"], nonzero=True, channel_wise=True),
-        # Same cropping as in training
-        CropForegroundd(keys=["image", "label"], source_key="image"),
-        # Same minimum size padding as in training
-        SpatialPadd(keys=["image", "label"], spatial_size=(128, 128, 128)),
         # Guarantee label tensor dtype for losses/metrics
         CastToTyped(keys=["label"], dtype=torch.int64),
         # Pad to multiples of 16 (UNet down/upsampling compatibility)

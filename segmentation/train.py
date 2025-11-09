@@ -95,7 +95,9 @@ class Trainer:
             print(
                 f"Train Loss: {train_loss:.4f}, Train mean Dice: {train_mean_dice:.4f}, Train mean Hausdorff: {train_mean_hausdorff}"
             )
-            print(f"Train per class Hausdorf (foreground): {train_per_class_hausdorff}")
+            print(
+                f"Train per class Hausdorff (foreground): {train_per_class_hausdorff}"
+            )
             self.graph_maker.save_slice(epoch, train_mean_dice, to="train")
 
             val_loss, val_per_class_dice, val_per_class_hausdorff = self._validate(
@@ -107,7 +109,7 @@ class Trainer:
             print(
                 f"Val Loss: {val_loss:.4f}, Val mean Dice: {val_mean_dice:.4f}, Val mean Hausdorff: {val_mean_hausdorff:.4f}"
             )
-            print(f"Val per class Hausdorf (foreground): {val_per_class_hausdorff}")
+            print(f"Val per class Hausdorff (foreground): {val_per_class_hausdorff}")
             self.graph_maker.save_slice(epoch, val_mean_dice, to="val")
 
             self.metric_saver.save_entry(
@@ -231,7 +233,7 @@ class Trainer:
     ) -> torch.Tensor:
         """
         Calculates Hausdorff distance per class for 3D predictions, skipping class 0 (background)
-        return tensor with shape (B, C).
+        Returns tensor with shape (C,) (foreground_classes_cnt,): mean Hausdorff distance per class over the batch.
         """
         preds = torch.argmax(logits, dim=1)  # (B, D, H, W)
         tgt = target.squeeze(1).long()  # (B, D, H, W)
@@ -318,6 +320,7 @@ class Trainer:
 
         with torch.no_grad():
             with tqdm(dataloader, desc="Validation") as progress:
+                random_index = np.random.randint(len(dataloader))
                 for i, (images, masks) in enumerate(progress):
                     images, masks = prepare_images_and_masks(images, masks, device)
 
@@ -330,7 +333,7 @@ class Trainer:
                     dice_scores_per_class.append(dice_per_class)
                     hausdorff_per_class.append(hausdorff_metric)
 
-                    if i == 0:
+                    if i == random_index:
                         self.graph_maker.set_prediction_and_ground_truth_slice(
                             outputs, masks
                         )

@@ -4,6 +4,7 @@ from typing import Any, Dict, Tuple, cast
 
 import torch
 from torch.utils.data import DataLoader, Subset as TorchSubset
+from torch.utils.data import DataLoader, Subset as TorchSubset
 
 from segmentation.config import CLUSTER_TRAINING_ENABLED
 from segmentation.dataset import BrainTumorDataset
@@ -60,6 +61,26 @@ def get_datasets(
     print(train_inner.transform)
     print(val_inner.transform)
     print("-------------------------")
+    indices = list(range(total_samples))
+    train_indices = indices[:train_size]
+    val_indices = indices[train_size:total_samples]
+
+    train_dataset = torch.utils.data.Subset(full_dataset, train_indices)
+    val_dataset = torch.utils.data.Subset(copy.deepcopy(full_dataset), val_indices)
+
+    train_inner = cast(BrainTumorDataset, train_dataset.dataset)
+    val_inner = cast(BrainTumorDataset, val_dataset.dataset)
+
+    train_inner.transform = train_transforms
+    train_inner.target_transform = train_transforms
+
+    val_inner.transform = val_transforms
+    val_inner.target_transform = val_transforms
+
+    print("Applied transforms:")
+    print(train_inner.transform)
+    print(val_inner.transform)
+    print("-------------------------")
 
     if val_size <= 0:
         print(
@@ -70,6 +91,16 @@ def get_datasets(
     print(
         f"Training samples: {len(train_dataset)}, Validation samples: {len(val_dataset)}"
     )
+
+    train_ids = get_sample_ids(train_dataset)
+    val_ids = get_sample_ids(val_dataset)
+
+    overlap = set(train_ids) & set(val_ids)
+
+    print(f"\nTrain unique samples: {len(set(train_ids))}")
+    print(f"Val unique samples:   {len(set(val_ids))}")
+    print(f"Overlap count:        {len(overlap)}")
+
 
     train_ids = get_sample_ids(train_dataset)
     val_ids = get_sample_ids(val_dataset)

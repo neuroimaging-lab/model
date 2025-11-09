@@ -22,8 +22,9 @@ def get_dataset_dir():
 def get_temp_storage_path():
     if scratch:
         return Path(scratch) / "ndziwak" / "checkpoints"
-    print("Problem with $SCRATCH")
-    exit(1)
+    raise RuntimeError(
+        "Problem with $SCRATCH: Environment variable not set or invalid."
+    )
 
 
 TIMESTAMP = datetime.now().strftime("%Y%m%d_%H%M%S")
