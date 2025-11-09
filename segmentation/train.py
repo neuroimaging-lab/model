@@ -270,7 +270,7 @@ class Trainer:
         with tqdm(dataloader, desc="Training") as progress:
             for i, (images, masks) in enumerate(
                 progress
-            ):  # TODO: remove this i and remove if i == 0
+            ):
                 images, masks = prepare_images_and_masks(images, masks, device)
 
                 self.optimizer.zero_grad(set_to_none=True)
