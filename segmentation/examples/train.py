@@ -32,7 +32,7 @@ def example_train(
             dropout_rate=dropout_rate if dropout_rate else 0.0,
         )
 
-    optimizer = torch.optim.AdamW(model.parameters(), lr=lr if lr else 3e-4)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=lr if lr else 5e-5)
 
     trainer = Trainer(
         model=model,

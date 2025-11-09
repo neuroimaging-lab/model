@@ -1,4 +1,3 @@
-import math
 from typing import Dict, Literal, Optional
 
 from segmentation.config import DATA_LABELS
@@ -16,12 +15,12 @@ class FocalParamStrategy:
         class_proportions: Dict[str, float],
         metric_saver: MetricSaver,
         gamma: float = 2.0,
-        explicite_alpha: Optional[float] = None,
-        strategy: Literal["inverse", "inverse_sqrt", "log_scaling"] = "inverse_sqrt",
+        explicit_alpha: Optional[float] = None,
+        strategy: Literal["inverse", "inverse_sqrt"] = "inverse_sqrt",
     ):
         """
-        Calculates alpha values based on the provided strategy and class proportions if no explicite alpha provided.
-        If explicite alpha provided, uses explicite_alpha for the foreground and 1-explicite_alpha for the background
+        Calculates alpha values based on the provided strategy and class proportions if no explicit alpha provided.
+        If explicit alpha provided, uses explicit_alpha for the foreground and 1-explicit_alpha for the background
         Saves the parameters to a text file.
         """
         self._class_proportions: Dict[str, float] = class_proportions
@@ -31,12 +30,12 @@ class FocalParamStrategy:
         self.alpha: list[float]
         self.strategy: str
 
-        if explicite_alpha is not None:
+        if explicit_alpha is not None:
             self.alpha = [
-                1.0 - explicite_alpha,
-                explicite_alpha,
-                explicite_alpha,
-                explicite_alpha,
+                1.0 - explicit_alpha,  # Background
+                explicit_alpha,  # Edema
+                explicit_alpha,  # Non-enhancing tumor
+                explicit_alpha,  # Enhancing tumour
             ]
             self.strategy = "specified_by_hand"
         else:
@@ -52,15 +51,13 @@ class FocalParamStrategy:
         )
 
     def _compute_alpha(
-        self, strategy: Literal["inverse", "inverse_sqrt", "log_scaling"]
+        self, strategy: Literal["inverse", "inverse_sqrt"]
     ) -> list[float]:
         """Computes the alpha parameter for each class based on its proportion."""
         if strategy == "inverse":
             res_dict = self._calculate_inverse_frequency()
         elif strategy == "inverse_sqrt":
             res_dict = self._calculate_sqrt_inverse_frequency()
-        elif strategy == "log_scaling":
-            res_dict = self._calculate_log_scaling()
         else:
             raise ValueError(f"Unknown strategy: {strategy}")
 
@@ -95,11 +92,3 @@ class FocalParamStrategy:
             key: sqrt_inverse_freq[key] / total
             for key in self._class_proportions.keys()
         }
-
-    def _calculate_log_scaling(self) -> dict[str, float]:
-        log_scaled = {
-            label: 1.0 / math.log(1.02 + prop)
-            for label, prop in self._class_proportions.items()
-        }
-        total = sum(log_scaled.values())
-        return {key: log_scaled[key] / total for key in self._class_proportions.keys()}
