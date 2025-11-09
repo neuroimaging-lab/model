@@ -4,7 +4,6 @@ from typing import Any, Dict, Tuple, cast
 
 import torch
 from torch.utils.data import DataLoader, Subset as TorchSubset
-from torch.utils.data import DataLoader, Subset as TorchSubset
 
 from segmentation.config import CLUSTER_TRAINING_ENABLED
 from segmentation.dataset import BrainTumorDataset
@@ -100,7 +99,6 @@ def get_datasets(
     print(f"\nTrain unique samples: {len(set(train_ids))}")
     print(f"Val unique samples:   {len(set(val_ids))}")
     print(f"Overlap count:        {len(overlap)}")
-
 
     train_ids = get_sample_ids(train_dataset)
     val_ids = get_sample_ids(val_dataset)

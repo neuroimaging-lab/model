@@ -1,9 +1,6 @@
 from argparse import ArgumentParser
 from typing import Optional
 
-from argparse import ArgumentParser
-from typing import Optional
-
 import torch
 
 from segmentation.config import CLUSTER_TRAINING_ENABLED, DATASET_DIR

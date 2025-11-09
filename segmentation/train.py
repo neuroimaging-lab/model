@@ -270,9 +270,7 @@ class Trainer:
         hausdorff_per_class: List[torch.Tensor] = []
 
         with tqdm(dataloader, desc="Training") as progress:
-            for i, (images, masks) in enumerate(
-                progress
-            ):
+            for i, (images, masks) in enumerate(progress):
                 images, masks = prepare_images_and_masks(images, masks, device)
 
                 self.optimizer.zero_grad(set_to_none=True)
