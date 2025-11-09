@@ -80,7 +80,7 @@ class BottleNeck(nn.Module):
         self, in_channels: int, out_channels: int, dropout_rate: float = 0.0
     ) -> None:
         super().__init__()
-        self.conv = ConvBlock(in_channels, out_channels)
+        self.conv = ConvBlock(in_channels, out_channels, dropout_rate)
         self.dropout = nn.Dropout3d(p=dropout_rate)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
