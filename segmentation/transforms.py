@@ -73,10 +73,3 @@ val_transforms = Compose(
         DivisiblePadD(keys=["image", "label"], k=16),
     ]
 )
-
-
-val_transforms = Compose(
-    [
-        DivisiblePadD(keys=["image", "label"], k=16),
-    ]
-)
