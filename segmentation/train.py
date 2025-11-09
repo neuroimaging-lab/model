@@ -316,6 +316,7 @@ class Trainer:
 
         with torch.no_grad():
             with tqdm(dataloader, desc="Validation") as progress:
+                random_index = np.random.randint(len(dataloader))
                 for i, (images, masks) in enumerate(progress):
                     images, masks = prepare_images_and_masks(images, masks, device)
 
@@ -328,7 +329,7 @@ class Trainer:
                     dice_scores_per_class.append(dice_per_class)
                     hausdorff_per_class.append(hausdorff_metric)
 
-                    if i == 0:
+                    if i == random_index:
                         self.graph_maker.set_prediction_and_ground_truth_slice(
                             outputs, masks
                         )
