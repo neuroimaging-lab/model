@@ -100,15 +100,6 @@ def get_datasets(
     print(f"Val unique samples:   {len(set(val_ids))}")
     print(f"Overlap count:        {len(overlap)}")
 
-    train_ids = get_sample_ids(train_dataset)
-    val_ids = get_sample_ids(val_dataset)
-
-    overlap = set(train_ids) & set(val_ids)
-
-    print(f"\nTrain unique samples: {len(set(train_ids))}")
-    print(f"Val unique samples:   {len(set(val_ids))}")
-    print(f"Overlap count:        {len(overlap)}")
-
     return train_dataset, val_dataset
 
 
