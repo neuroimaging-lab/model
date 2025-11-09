@@ -14,6 +14,8 @@ from monai.transforms import (
 )
 import torch
 
+from segmentation.config import CLUSTER_TRAINING_ENABLED
+
 train_transforms = Compose(
     [
         # Normalize input based on the mean and standard deviation of non-zero voxels
@@ -63,13 +65,28 @@ train_transforms = Compose(
     ]
 )
 
-val_transforms = Compose(
-    [
-        # Same standardization as in training
-        NormalizeIntensityd(keys=["image"], nonzero=True, channel_wise=True),
-        # Guarantee label tensor dtype for losses/metrics
-        CastToTyped(keys=["label"], dtype=torch.int64),
-        # Pad to multiples of 16 (UNet down/upsampling compatibility)
-        DivisiblePadD(keys=["image", "label"], k=16),
-    ]
-)
+if CLUSTER_TRAINING_ENABLED:
+    val_transforms = Compose(
+        [
+            # Same standardization as in training
+            NormalizeIntensityd(keys=["image"], nonzero=True, channel_wise=True),
+            # Guarantee label tensor dtype for losses/metrics
+            CastToTyped(keys=["label"], dtype=torch.int64),
+            # Pad to multiples of 16 (UNet down/upsampling compatibility)
+            DivisiblePadD(keys=["image", "label"], k=16),
+        ]
+    )
+else:
+    val_transforms = Compose(
+        [
+            # Same standardization as in training
+            NormalizeIntensityd(keys=["image"], nonzero=True, channel_wise=True),
+            CropForegroundd(keys=["image", "label"], source_key="image"),
+            # Ensure the cropped volume is at least (128, 128, 128) patch size
+            SpatialPadd(keys=["image", "label"], spatial_size=(128, 128, 128)),
+            # Guarantee label tensor dtype for losses/metrics
+            CastToTyped(keys=["label"], dtype=torch.int64),
+            # Pad to multiples of 16 (UNet down/upsampling compatibility)
+            DivisiblePadD(keys=["image", "label"], k=16),
+        ]
+    )

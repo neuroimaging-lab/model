@@ -12,7 +12,6 @@ dependencies = [
     "torchsummary>=1.5.1",
     "tqdm>=4.67.1",
     "matplotlib>=3.8.0",
-    "scikit-image>=0.25.2",
 ]
 
 

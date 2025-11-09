@@ -7,7 +7,6 @@ import time
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
-from skimage.metrics import hausdorff_distance
 import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
@@ -233,35 +232,12 @@ class Trainer:
     ) -> torch.Tensor:
         """
         Calculates Hausdorff distance per class for 3D predictions, skipping class 0 (background)
-        Returns tensor with shape (C,) (foreground_classes_cnt,): mean Hausdorff distance per class over the batch.
         """
 
-        foreground_classes_cnt = logits.shape[1] - 1 
-        return torch.full((foreground_classes_cnt,), float(inf_representation), device=logits.device)
-    
-        preds = torch.argmax(logits, dim=1)  # (B, D, H, W)
-        tgt = target.squeeze(1).long()  # (B, D, H, W)
         foreground_classes_cnt = logits.shape[1] - 1
-
-        hausdorff_per_class = torch.zeros(
-            (logits.shape[0], foreground_classes_cnt), dtype=torch.float32
+        return torch.full(
+            (foreground_classes_cnt,), float(inf_representation), device=logits.device
         )
-
-        for batch in range(logits.shape[0]):
-            for cls in range(
-                1, foreground_classes_cnt + 1
-            ):  # Start from 1 to avoid background Hausdorff calculation
-                idx = cls - 1
-                pred_mask = (preds[batch] == cls).cpu().numpy().astype(bool)
-                tgt_mask = (tgt[batch] == cls).cpu().numpy().astype(bool)
-
-                distance = hausdorff_distance(pred_mask, tgt_mask)
-                distance = distance if distance is not None else inf_representation
-                distance = min(distance, inf_representation)
-
-                hausdorff_per_class[batch, idx] = distance
-
-        return hausdorff_per_class.mean(dim=0)
 
     def _train_one_epoch(
         self,

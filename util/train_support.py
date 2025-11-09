@@ -179,9 +179,6 @@ def cut_images_and_masks(
 def prepare_images_and_masks(
     images: torch.Tensor, masks: torch.Tensor, device: str
 ) -> Tuple[torch.Tensor, torch.Tensor]:
-    if not CLUSTER_TRAINING_ENABLED:
-        images, masks = cut_images_and_masks(images, masks)
-
     images = images.to(device, non_blocking=True)
     masks = masks.to(device, non_blocking=True)
 
