@@ -31,6 +31,7 @@ TIMESTAMP = datetime.now().strftime("%Y%m%d_%H%M%S")
 CURR_RUN = f"run_{TIMESTAMP}"
 METRICS_DIR = f"metrics/{CURR_RUN}/"
 DATA_LABELS = ["Background", "Edema", "Non-enhancing tumor", "Enhancing tumour"]
+MODALITIES = ["FLAIR", "T1w", "t1gd", "T2w"]
 DATASET_DIR = get_dataset_dir()
 
 # Whether to save best model while training

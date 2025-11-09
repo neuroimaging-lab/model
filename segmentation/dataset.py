@@ -9,6 +9,8 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 
+from segmentation.config import MODALITIES
+
 
 class BrainTumorDataset(Dataset):
     """
@@ -21,7 +23,7 @@ class BrainTumorDataset(Dataset):
         split: str = "train",
         transform: Optional[Callable] = None,
         target_transform: Optional[Callable] = None,
-        modalities: List[str] = ["FLAIR", "T1w", "t1gd", "T2w"],
+        modalities: List[str] = MODALITIES,
         cache_data: bool = False,
         preload: bool = False,
     ) -> None:
@@ -115,7 +117,9 @@ class BrainTumorDataset(Dataset):
         image_data = nii_img.get_fdata()  # Shape: [H, W, D, C]
 
         if len(self.modalities) > 0:
-            image_data = image_data[..., self.modalities]
+            image_data = image_data[
+                ..., self.modalities
+            ]  # Filtering to selected modalities
 
         # Transpose to [C, D, H, W] format for PyTorch
         image_data = np.transpose(image_data, (3, 2, 0, 1))
