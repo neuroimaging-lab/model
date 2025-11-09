@@ -56,7 +56,7 @@ def example_train(
 def parse_args() -> tuple[
     Optional[float], Optional[float], Optional[float], Optional[float], bool
 ]:
-    parser: ArgumentParser = ArgumentParser(description="Fine tunning runner")
+    parser: ArgumentParser = ArgumentParser(description="Fine tuning runner")
     parser.add_argument("--gamma", nargs="+", type=float, help="Gamma value")
     parser.add_argument("--alpha", nargs="+", type=float, help="Alpha value")
     parser.add_argument("--lr", nargs="+", type=float, help="Learning rate value")

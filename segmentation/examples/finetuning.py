@@ -12,7 +12,7 @@ def fine_tune():
         product(gamma, alpha, learning_rate, dropout_rate)
     )
 
-    succes_iterations: int = 0
+    success_iterations: int = 0
     for i, params in enumerate(param_combinations):
         y, a, lr, dr = params
         command = [
@@ -38,10 +38,10 @@ def fine_tune():
         if result.returncode != 0:
             print(f"Process failed with parameters: {params}")
             continue
-        succes_iterations += 1
+        success_iterations += 1
 
     print(
-        f"End of fine tunning! {succes_iterations}/{len(param_combinations)} success iterations!"
+        f"End of fine tuning! {success_iterations}/{len(param_combinations)} success iterations!"
     )
 
 
