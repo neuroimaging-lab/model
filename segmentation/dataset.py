@@ -9,6 +9,8 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 
+from segmentation.config import MODALITIES
+
 
 class BrainTumorDataset(Dataset):
     """
@@ -21,9 +23,9 @@ class BrainTumorDataset(Dataset):
         split: str = "train",
         transform: Optional[Callable] = None,
         target_transform: Optional[Callable] = None,
-        modalities: List[str] = ["FLAIR", "T1w", "t1gd", "T2w"], #TODO: understand what are those modalities, it's relation with background, edema, etc #TODO: export those values to config
-        cache_data: bool = False, #TODO: never used???
-        preload: bool = False, #TODO: never used???
+        modalities: List[str] = MODALITIES,
+        cache_data: bool = False,
+        preload: bool = False,
     ) -> None:
         """
         Initialize the BrainTumorDataset.
@@ -53,7 +55,7 @@ class BrainTumorDataset(Dataset):
         self.num_modalities = len(self.dataset_info["modality"])
 
         self.modalities = [
-            self.modality_map[mod] for mod in modalities if mod in self.modality_map #TODO: simplify it to [0,1,2,3], remove this
+            self.modality_map[mod] for mod in modalities if mod in self.modality_map
         ]
 
         if split == "train":
@@ -115,7 +117,7 @@ class BrainTumorDataset(Dataset):
         image_data = nii_img.get_fdata()  # Shape: [H, W, D, C]
 
         if len(self.modalities) > 0:
-            image_data = image_data[..., self.modalities] #TODO: we always use all modalities, so self.modalities = [0,1,2,3], so remove this
+            image_data = image_data[..., self.modalities] # Filtering to selected modalities
 
         # Transpose to [C, D, H, W] format for PyTorch
         image_data = np.transpose(image_data, (3, 2, 0, 1))
