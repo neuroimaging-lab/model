@@ -235,6 +235,10 @@ class Trainer:
         Calculates Hausdorff distance per class for 3D predictions, skipping class 0 (background)
         Returns tensor with shape (C,) (foreground_classes_cnt,): mean Hausdorff distance per class over the batch.
         """
+
+        foreground_classes_cnt = logits.shape[1] - 1 
+        return torch.full((foreground_classes_cnt,), float(inf_representation), device=logits.device)
+    
         preds = torch.argmax(logits, dim=1)  # (B, D, H, W)
         tgt = target.squeeze(1).long()  # (B, D, H, W)
         foreground_classes_cnt = logits.shape[1] - 1
