@@ -52,9 +52,9 @@ def example_train(
 
 def parse_args() -> tuple[Optional[float], Optional[float], Optional[float], bool]:
     parser: ArgumentParser = ArgumentParser(description="Fine tuning runner")
-    parser.add_argument("--gamma", nargs="+", type=float, help="Gamma value")
-    parser.add_argument("--alpha", nargs="+", type=float, help="Alpha value")
-    parser.add_argument("--lr", nargs="+", type=float, help="Learning rate value")
+    parser.add_argument("--gamma", type=float, help="Gamma value")
+    parser.add_argument("--alpha", type=float, help="Alpha value")
+    parser.add_argument("--lr", type=float, help="Learning rate value")
     parser.add_argument(
         "--store-checkpoints-in-temp-storage",
         action="store_true",
@@ -64,9 +64,9 @@ def parse_args() -> tuple[Optional[float], Optional[float], Optional[float], boo
     try:
         args = parser.parse_args()
         return (
-            args.gamma[0],
-            args.alpha[0],
-            args.lr[0],
+            args.gamma,
+            args.alpha,
+            args.lr,
             args.store_checkpoints_in_temp_storage,
         )
     except Exception:
