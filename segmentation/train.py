@@ -185,7 +185,7 @@ class Trainer:
         loss = -alpha_t * focal_term * log_pt
         return loss.mean()
 
-    def _dice_coefficient_per_class(
+    def _dice_score_per_class(
         self,
         logits: torch.Tensor,  # (B, C, D, H, W)
         target: torch.Tensor,  # (B, 1, D, H, W) containing class indices (int)
@@ -228,7 +228,7 @@ class Trainer:
                 self.optimizer.step()
 
                 with torch.no_grad():
-                    dice_per_class = self._dice_coefficient_per_class(outputs, masks)
+                    dice_per_class = self._dice_score_per_class(outputs, masks)
                     dice_scores_per_class.append(dice_per_class)
                     epoch_loss_acc += loss.item()
 
@@ -262,7 +262,7 @@ class Trainer:
                     loss = self._focal_loss(outputs, masks, self.focal_param_strategy)
                     val_loss_acc += loss.item()
 
-                    dice_per_class = self._dice_coefficient_per_class(outputs, masks)
+                    dice_per_class = self._dice_score_per_class(outputs, masks)
                     dice_scores_per_class.append(dice_per_class)
 
                     if i == random_index:

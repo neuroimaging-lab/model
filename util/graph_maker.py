@@ -188,7 +188,7 @@ class GraphMaker:
             marker="s",
         )
 
-        ax.set_title("Dice Score Over Epochs", fontsize=14, fontweight="bold")
+        ax.set_title("Mean Dice Score Over Epochs", fontsize=14, fontweight="bold")
         ax.set_xlabel("Epoch", fontsize=12)
         ax.set_ylabel("Dice Score", fontsize=12)
         ax.set_ylim(0, 1)
@@ -254,7 +254,7 @@ class GraphMaker:
             ax.legend(fontsize=9, loc="lower right")
 
         plt.suptitle(
-            "Per-Class Dice Coefficient During Training and Validation",
+            "Per-Class Mean Dice Score During Training and Validation",
             fontsize=14,
             fontweight="bold",
         )
