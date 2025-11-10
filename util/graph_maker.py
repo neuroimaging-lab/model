@@ -26,9 +26,6 @@ class GraphMaker:
         self.slice_idx = None
         self.metrics_path: str = METRICS_DIR + "metrics.csv"
 
-        max_distance_in_mri = (160**2 + 240**2 + 240**2) ** 0.5
-        self.INF_PLOT_REPRESENTATION = int(max_distance_in_mri)
-
         os.makedirs(self.slices_dir_path)
         os.makedirs(self.slices_train_path)
         os.makedirs(self.slices_val_path)
@@ -213,7 +210,7 @@ class GraphMaker:
         if metric == "Dice":
             ax.set_ylim(0, 1)
         else:
-            ax.set_ylim(0, self.INF_PLOT_REPRESENTATION)
+            ax.set_ylim(0, 1)
 
         min_epoch, max_epoch, step = self._get_epochs_info(epochs)
         ax.set_xlim(min_epoch, max_epoch + 0.5)
@@ -288,7 +285,7 @@ class GraphMaker:
             if metric == "Dice":
                 ax.set_ylim(0, 1)
             else:
-                ax.set_ylim(0, self.INF_PLOT_REPRESENTATION)
+                ax.set_ylim(0, 1)
             ax.grid(True, linestyle="--", alpha=0.6)
             ax.legend(fontsize=9, loc="lower right")
 
