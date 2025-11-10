@@ -230,14 +230,21 @@ class Trainer:
         target: torch.Tensor,  # (B, 1, D, H, W)
         inf_representation: float = ceil(hypot(160, 240, 240)),
     ) -> torch.Tensor:
-        """
-        Calculates Hausdorff distance per class for 3D predictions, skipping class 0 (background)
-        """
-
+        """Calculates Hausdorff distance approximation per class for 3D predictions, skipping class 0 (background) - with usage of root mean square distance."""
         foreground_classes_cnt = logits.shape[1] - 1
-        return torch.full(
-            (foreground_classes_cnt,), float(inf_representation), device=logits.device
-        )
+        # return torch.full((foreground_classes_cnt,), float(inf_representation), device=logits.device)
+        preds = torch.argmax(logits, dim=1)  # (B, D, H, W)
+        tgt = target.squeeze(1).long()  # (B, D, H, W)
+        foreground_classes_cnt = logits.shape[1] - 1
+        distances = []
+        for cls in range(1, foreground_classes_cnt + 1):
+            pred_mask = (preds == cls).float()
+            tgt_mask = (tgt == cls).float()
+            diff = torch.abs(pred_mask - tgt_mask)
+            d = torch.sqrt((diff**2).mean())
+            distances.append(d)
+
+        return torch.stack(distances)
 
     def _train_one_epoch(
         self,
