@@ -1,13 +1,13 @@
+import copy
 from pathlib import Path
-from typing import Any, Tuple, Union
+from typing import Any, Dict, Tuple, cast
 
 import torch
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset as TorchSubset
 
 from segmentation.config import CLUSTER_TRAINING_ENABLED
 from segmentation.dataset import BrainTumorDataset
-from segmentation.transforms import train_transforms
-from util.image_manipulation import cut_images_and_masks
+from segmentation.transforms import train_transforms, val_transforms
 
 
 def get_datasets(
@@ -29,45 +29,71 @@ def get_datasets(
         root_dir=str(root_dir),
         split="train",
         modalities=["FLAIR", "T1w", "t1gd", "T2w"],
-        transform=train_transforms,
-        target_transform=train_transforms,
         cache_data=False,
     )
 
-    final_dataset: Union[BrainTumorDataset, torch.utils.data.Subset[Any]]
-
     if max_total_samples > 0 and max_total_samples < len(full_dataset):
-        final_dataset = torch.utils.data.Subset(full_dataset, range(max_total_samples))
         total_samples = max_total_samples
     else:
-        final_dataset = full_dataset
-        total_samples = len(final_dataset)
+        total_samples = len(full_dataset)
 
     print(f"Total samples in dataset: {total_samples}")
     val_size = int(val_split * total_samples)
     val_size = max(1, val_size) if total_samples > 1 else 0
     train_size = total_samples - val_size
 
-    train_dataset = torch.utils.data.Subset(final_dataset, range(train_size))
+    indices = list(range(total_samples))
+    train_indices = indices[:train_size]
+    val_indices = indices[train_size:total_samples]
+
+    train_dataset = torch.utils.data.Subset(full_dataset, train_indices)
+    val_dataset = torch.utils.data.Subset(copy.deepcopy(full_dataset), val_indices)
+
+    train_inner = cast(BrainTumorDataset, train_dataset.dataset)
+    val_inner = cast(BrainTumorDataset, val_dataset.dataset)
+
+    train_inner.transform = train_transforms
+    train_inner.target_transform = train_transforms
+
+    val_inner.transform = val_transforms
+    val_inner.target_transform = val_transforms
+
+    print("Applied transforms:")
+    print(train_inner.transform)
+    print(val_inner.transform)
+    print("-------------------------")
 
     if val_size <= 0:
         print(
             "No validation samples available, using the same as for the training."
         )  # It is strictly for overfitting check on 1 sample
         val_dataset = train_dataset
-    else:
-        val_dataset = torch.utils.data.Subset(
-            final_dataset, range(train_size, max_total_samples)
-        )
 
     print(
         f"Training samples: {len(train_dataset)}, Validation samples: {len(val_dataset)}"
     )
+
+    train_ids = get_sample_ids(train_dataset)
+    val_ids = get_sample_ids(val_dataset)
+
+    overlap = set(train_ids) & set(val_ids)
+
+    print(f"\nTrain unique samples: {len(set(train_ids))}")
+    print(f"Val unique samples:   {len(set(val_ids))}")
+    print(f"Overlap count:        {len(overlap)}")
+
     return train_dataset, val_dataset
 
 
+def get_sample_ids(subset: TorchSubset[BrainTumorDataset]) -> list[str]:
+    ds = cast(BrainTumorDataset, subset.dataset)
+    indices = subset.indices
+
+    return [ds.file_list[idx]["image"] for idx in indices]
+
+
 def create_dataloaders(
-    data_config, root_dir: Path, max_total_samples: int
+    data_config: Dict[str, Any], root_dir: Path, max_total_samples: int
 ) -> Tuple[DataLoader, DataLoader]:
     """Create data loaders for training and validation datasets to use during training."""
 
@@ -120,29 +146,34 @@ def save_model(
     )
 
 
-def ensure_class_indices(target: torch.Tensor, num_classes: int) -> torch.Tensor:
+def cut_images_and_masks(
+    images: torch.Tensor, masks: torch.Tensor
+) -> tuple[torch.Tensor, torch.Tensor]:
     """
-    Ensure target is class indices tensor of shape (B, 1, D, H, W), dtype long.
-    Accepts:
-      - (B, 1, D, H, W) with ints
-      - (B, C, D, H, W) one-hot (will be argmaxed)
-      - (B, D, H, W) (will add channel dim)
+    Reduces voxel dimensions for the images and corresponding masks, by center-cropping.
+    Used as a test tool for the local development - (e.g. 160x240x240 → 80x160x160) - to be able to fit an MRI image inside a model with full channels.
     """
-    # We want to keep the shape consistent here, (B, D, H, W), later ensure the values are of dtype long
-    # and finally add channel dim to return tensor with shape (B, 1, D, H, W)
-    if target.ndim == 5 and target.shape[1] == 1:
-        tgt = target.squeeze(1)
-    elif target.ndim == 5 and target.shape[1] == num_classes:
-        tgt = torch.argmax(target, dim=1)
-    elif target.ndim == 4:
-        tgt = target
-    else:
-        raise ValueError(f"Unexpected target shape: {tuple(target.shape)}")
+    depth = 80  # base 160
+    height = 160  # base 240
+    width = 160  # base 240
 
-    if tgt.dtype != torch.long:
-        tgt = tgt.long()
+    start_d = (160 - depth) // 2
+    start_h = (240 - height) // 2
+    start_w = (240 - width) // 2
 
-    return tgt.unsqueeze(1)
+    return images[
+        :,
+        :,
+        start_d : start_d + depth,
+        start_h : start_h + height,
+        start_w : start_w + width,
+    ], masks[
+        :,
+        :,
+        start_d : start_d + depth,
+        start_h : start_h + height,
+        start_w : start_w + width,
+    ]
 
 
 def prepare_images_and_masks(
@@ -153,10 +184,5 @@ def prepare_images_and_masks(
 
     images = images.to(device, non_blocking=True)
     masks = masks.to(device, non_blocking=True)
-
-    masks = ensure_class_indices(
-        masks,
-        num_classes=images.shape[1],
-    )
 
     return images, masks

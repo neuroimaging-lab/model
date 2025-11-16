@@ -36,7 +36,6 @@ def load_single_sample(file_path: str, modalities=["FLAIR", "T1w", "t1gd", "T2w"
         modalities=modalities,
         transform=train_transforms,
         target_transform=train_transforms,
-        cache_data=False,
     )
 
     image, _ = dataset[0]
