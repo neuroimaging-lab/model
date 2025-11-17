@@ -23,17 +23,3 @@ Check typing
 ```bash
 uv run mypy . --config-file pyproject.toml  # runs type linter
 ```
-
-## Library installation
-
-### Build the package
-
-```bash
-python setup.py sdist bdist_wheel
-```
-
-### Install the library using pip
-
-```bash
-pip install dist/abnormality_detection_from_neuroimaging-1.0.1-py3-none-any.whl
-```

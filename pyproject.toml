@@ -17,11 +17,11 @@ dependencies = [
 
 
 [dependency-groups]
-dev = ["ruff>=0.11.4", "mypy>=1.15.0", "types-tqdm"]
+dev = ["ruff>=0.11.4", "mypy>=1.15.0", "types-tqdm", "types-setuptools"]
 
 
 [tool.mypy]
-exclude = [".venv", "library"]
+exclude = [".venv"]
 
 
 [tool.ruff.lint.isort]

@@ -1,12 +1,14 @@
 from setuptools import find_packages, setup
 
 setup(
-    name="abnormality_detection_from_neuroimaging",
-    version="1.0.1",
+    name="neuroimaging",
+    version="1.0.0",
     packages=find_packages(),
-    include_package_data=True,
-    package_data={
-        "abnormality_detection_from_neuroimaging": ["3DU-Net-model.pt"],
-    },
-    install_requires=["torch", "nibabel", "numpy", "pathlib"],
+    include_package_data=False,
+    install_requires=[
+        "torch",
+        "nibabel",
+        "numpy",
+        "huggingface_hub",
+    ],
 )
