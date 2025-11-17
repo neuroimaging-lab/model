@@ -29,6 +29,15 @@ class UNet3DTransforms:
     """Factory for MONAI Compose pipelines aligned with the training/validation recipes."""
 
     @classmethod
+    def normalize_input(cls) -> "ComposeType":
+        return Compose(
+            [
+                NormalizeIntensityd(keys=["image"], nonzero=True, channel_wise=True),
+                DivisiblePadD(keys=["image"], k=16),
+            ]
+        )
+
+    @classmethod
     def validation(cls) -> "ComposeType":
         return Compose(
             [
