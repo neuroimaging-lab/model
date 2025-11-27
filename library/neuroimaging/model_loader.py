@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional
 
-from huggingface_hub import hf_hub_download
+from huggingface_hub import hf_hub_download  # type: ignore[import]
 import torch
 
 HF_REPO_ID = "N1T1/neuroimaging_UNet3D"

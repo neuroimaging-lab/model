@@ -27,8 +27,8 @@ def test_public_api_exports() -> None:
     expected_symbols = [
         "load_trained_UNet3D_model",
         "UNet3DModel",
-        "UNet3DSegmenter",
-        "UNet3DTransforms",
+        "VolumeSegmenter",
+        "Transforms",
     ]
 
     missing = [symbol for symbol in expected_symbols if not hasattr(neuro, symbol)]
@@ -54,7 +54,7 @@ def test_prepare_input_pipeline(
     img = image.permute(3, 2, 0, 1).contiguous()  # (C, D, H, W)
     lbl = label.permute(2, 0, 1).unsqueeze(0).long().contiguous()  # (1, D, H, W)
 
-    tfm = neuro.UNet3DTransforms.validation()
+    tfm = neuro.Transforms.validation()
     out = tfm({"image": img, "label": lbl})
     if isinstance(out, list):
         out = out[0]
@@ -72,23 +72,22 @@ def test_prepare_input_pipeline(
     result_label = t_lbl.squeeze(0).permute(1, 2, 0).to(torch.int16).numpy()
     nib.save(nib.Nifti1Image(result_label, label_nii.affine), str(lbl_out))
 
-    tensor = neuro.UNet3DSegmenter.prepare_input(img_out, device="cpu")
+    tensor = neuro.VolumeSegmenter.prepare_input(img_out, device="cpu")
 
-    assert tensor.shape[0] == 1
-    assert tensor.shape[1] == 4
+    assert tensor.shape[0] == 4
     return tensor
 
 
 def test_model_forward_pass(tensor: torch.Tensor, output_dir: Path) -> None:
     neuro = importlib.import_module("neuroimaging")
     output_dir.mkdir(parents=True, exist_ok=True)
-    segmenter_weights = neuro.UNet3DSegmenter.from_state_dict(
+    segmenter_weights = neuro.VolumeSegmenter.from_state_dict(
         weights_path=BEST_WEIGHTS_PATH,
         device="cpu",
     )
     mask_path_weights = output_dir / "neuroimaging_smoke_mask_weights.nii.gz"
     mask = segmenter_weights.predict(tensor, output_path=mask_path_weights)
-    segmenter = neuro.UNet3DSegmenter.from_packaged_checkpoint(device="cpu")
+    segmenter = neuro.VolumeSegmenter.from_pretrained(device="cpu")
     mask_path = output_dir / "neuroimaging_smoke_mask.nii.gz"
     mask = segmenter.predict(tensor, output_path=mask_path)
     assert mask.shape == tuple(tensor.shape[-3:])

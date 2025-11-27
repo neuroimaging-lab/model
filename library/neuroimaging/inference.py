@@ -25,7 +25,7 @@ from library.neuroimaging.model_loader import (
 from segmentation.models.unet3d import UNet3D
 
 
-class UNet3DTransforms:
+class Transforms:
     """Factory for MONAI Compose pipelines aligned with the training/validation recipes."""
 
     @classmethod
@@ -103,7 +103,7 @@ class UNet3DModel(UNet3D):
         return model
 
 
-class UNet3DSegmenter:
+class VolumeSegmenter:
     """High-level inference helper mirroring the ergonomics of other ML libraries."""
 
     def __init__(self, model: nn.Module, device: str = "cpu") -> None:
@@ -112,7 +112,7 @@ class UNet3DSegmenter:
         self.model.eval()
 
     @classmethod
-    def from_packaged_checkpoint(cls, device: str = "cpu") -> "UNet3DSegmenter":
+    def from_pretrained(cls, device: str = "cpu") -> "VolumeSegmenter":
         """Load the TorchScript model."""
         model = load_trained_UNet3D_model(device=device)
         return cls(model=model, device=device)
@@ -123,7 +123,7 @@ class UNet3DSegmenter:
         weights_path: Path,
         device: str = "cpu",
         **model_kwargs,
-    ) -> "UNet3DSegmenter":
+    ) -> "VolumeSegmenter":
         """Instantiate a native PyTorch UNet3D model from weights."""
         model = UNet3DModel.from_weights(
             weights_path=weights_path, device=device, **model_kwargs
@@ -135,6 +135,13 @@ class UNet3DSegmenter:
         x: torch.Tensor,
         output_path: Optional[Path] = Path("predicted_mask.nii.gz"),
     ):
+        if x.ndim == 4:
+            x = x.unsqueeze(0)
+        elif x.ndim != 5:
+            raise ValueError(
+                f"Expected (C,D,H,W) or (B,C,D,H,W), got shape {tuple(x.shape)}"
+            )
+
         with torch.no_grad():
             output = self.model(x.to(self.device))
 
@@ -158,6 +165,6 @@ class UNet3DSegmenter:
             data = np.expand_dims(data, axis=-1)
 
         data = np.transpose(data, (3, 2, 0, 1))
-        x = torch.from_numpy(data).unsqueeze(0).float().to(device)  # (1, C, D, H, W)
+        x = torch.from_numpy(data).float().to(device)  # (1, C, D, H, W)
 
         return x
