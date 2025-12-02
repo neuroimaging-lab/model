@@ -1,9 +1,5 @@
 from pathlib import Path
 import sys
-
-project_root = Path(__file__).resolve().parents[2]
-sys.path.append(str(project_root))
-
 from typing import Iterable, Optional, Sequence
 
 from monai.transforms import (
@@ -19,10 +15,9 @@ import numpy as np
 import torch
 from torch import nn
 
-from library.neuroimaging.model_loader import (
-    load_trained_UNet3D_model,
-)
-from segmentation.models.unet3d import UNet3D
+from neuroimaging_models.unet3d import UNet3D
+
+from .model_loader import load_trained_UNet3D_model
 
 
 class Transforms:
@@ -165,6 +160,6 @@ class VolumeSegmenter:
             data = np.expand_dims(data, axis=-1)
 
         data = np.transpose(data, (3, 2, 0, 1))
-        x = torch.from_numpy(data).float().to(device)  # (1, C, D, H, W)
+        x = torch.from_numpy(data).float().to(device)  # (C, D, H, W)
 
         return x

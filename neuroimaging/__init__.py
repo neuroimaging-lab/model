@@ -1,4 +1,4 @@
-from segmentation.models.unet3d import UNet3D
+from neuroimaging_models.unet3d import UNet3D
 
 from .inference import (
     Transforms,
