@@ -3,7 +3,7 @@ name = "neuroimaging"
 version = "1.0.0"
 description = "3D brain MRI segmentation with a packaged UNet3D trained model and simple inference API."
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = [
     "monai>=1.4.0",
     "nibabel>=5.3.2",
