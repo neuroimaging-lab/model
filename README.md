@@ -5,8 +5,6 @@ Minimal, copy-pasteable way to predict the packaged TorchScript model on your ow
 ```python
 from pathlib import Path
 
-import torch
-
 from neuroimaging import VolumeSegmenter, Transforms
 
 image_path = Path("path/to/your_scan.nii.gz")
