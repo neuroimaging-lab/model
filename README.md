@@ -1,6 +1,30 @@
+# Library quickstart
+
+Minimal, copy-pasteable way to predict the packaged TorchScript model on your own NIfTI image
+
+```python
+from pathlib import Path
+
+from neuroimaging import VolumeSegmenter, Transforms
+
+image_path = Path("path/to/your_scan.nii.gz")
+device = "cpu"
+
+input_tensor = VolumeSegmenter.prepare_input(image_path, device=device)
+
+preprocessor = Transforms.normalize_input()
+normalized_data = preprocessor({"image": input_tensor})
+input_tensor = normalized_data["image"].to(device)
+
+segmenter = VolumeSegmenter.from_pretrained(device=device)
+mask = segmenter.predict(
+    input_tensor, output_path=image_path.with_name("predicted_mask.nii.gz")
+)
+```
+
 # Model
 
-## Setup
+## Development
 
 ### Install uv
 
