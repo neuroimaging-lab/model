@@ -1,6 +1,6 @@
 # 3D U-Net - Brain Tumor Segmentation
 
-This repository provides an implementation of the 3D U-Net model architecture, based on the Google DeepMind paper [arxiv](https://arxiv.org/abs/1606.06650). The model was trained on the AGH Cyfronet cluster using an NVIDIA A100-SXM4-40GB accelerator, with 300 epochs taking approximately 16 hours to complete   
+This repository provides an implementation of the 3D U-Net model architecture, based on the Google DeepMind paper [arxiv](https://arxiv.org/abs/1606.06650). The model was trained using [medicaldecathlon dataset](http://medicaldecathlon.com/) on the AGH Cyfronet cluster using an NVIDIA A100-SXM4-40GB accelerator, with 500 epochs taking approximately 28 hours to complete with 480 MRI scans achieving 0.8335 Dice Score.
 
 ## Library
 
