@@ -3,8 +3,8 @@ from typing import Optional
 
 import torch
 
+from neuroimaging_models.unet3d import UNet3D
 from segmentation.config import CLUSTER_TRAINING_ENABLED, DATASET_DIR
-from segmentation.models.unet3d import UNet3D
 from segmentation.train import Trainer
 
 

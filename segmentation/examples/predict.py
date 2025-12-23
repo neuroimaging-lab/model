@@ -4,8 +4,8 @@ import numpy as np
 import torch
 from torch.nn import functional as F
 
+from neuroimaging_models.unet3d import UNet3D
 from segmentation.dataset import BrainTumorDataset
-from segmentation.models.unet3d import UNet3D
 from segmentation.transforms import train_transforms
 
 

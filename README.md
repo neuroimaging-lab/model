@@ -1,25 +1,29 @@
-# Model
+# 3D U-Net - Brain Tumor Segmentation
 
-## Setup
+This repository provides an implementation of the 3D U-Net model architecture, based on the Google DeepMind paper [arxiv](https://arxiv.org/abs/1606.06650). The model was trained using [medicaldecathlon dataset](http://medicaldecathlon.com/) on the AGH Cyfronet cluster using an NVIDIA A100-SXM4-40GB accelerator, with 500 epochs taking approximately 28 hours to complete with 484 MRI scans achieving 0.8335 Dice Score.
 
-### Install uv
+## Library
 
-https://docs.astral.sh/uv/getting-started/installation/
+The trained model is available via the [PyPI library](https://pypi.org/project/neuroimaging/) for easy loading and inference on your own data. The library also includes the model architecture, allowing you to experiment with training and fine-tuning. 
 
+Example code snippet:
 
-```bash
-uv venv                                     # creates venv
-uv sync --all-extras --dev                  # installs dependencies on venv
-uv run -m segmentation.examples.models      # this is how to run .py files
-```
+```python
+from pathlib import Path
 
-Format code with ruff
-```bash
-uv run ruff check --select I --fix    # format imports, or run without --fix to check only
-uv run ruff format                    # format code, or run with --check
-```
+from neuroimaging import VolumeSegmenter, Transforms
 
-Check typing
-```bash
-uv run mypy . --config-file pyproject.toml  # runs type linter
+image_path = Path("path/to/your_scan.nii.gz")
+device = "cpu"
+
+input_tensor = VolumeSegmenter.prepare_input(image_path, device=device)
+
+preprocessor = Transforms.normalize_input()
+normalized_data = preprocessor({"image": input_tensor})
+input_tensor = normalized_data["image"].to(device)
+
+segmenter = VolumeSegmenter.from_pretrained(device=device)
+mask = segmenter.predict(
+    input_tensor, output_path=image_path.with_name("predicted_mask.nii.gz")
+)
 ```
