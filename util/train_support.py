@@ -5,7 +5,6 @@ from typing import Any, Dict, Tuple, cast
 import torch
 from torch.utils.data import DataLoader, Subset as TorchSubset
 
-from segmentation.config import CLUSTER_TRAINING_ENABLED
 from segmentation.dataset import BrainTumorDataset
 from segmentation.transforms import train_transforms, val_transforms
 
