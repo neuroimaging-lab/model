@@ -1,13 +1,11 @@
 from __future__ import annotations
 
 from datetime import timedelta
-from math import ceil, hypot
 from pathlib import Path
 import time
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
-from skimage.metrics import hausdorff_distance
 import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
@@ -86,30 +84,19 @@ class Trainer:
         for epoch in range(epochs + 1):
             print(f"\nEpoch {epoch}/{epochs}")
 
-            train_loss, train_per_class_dice, train_per_class_hausdorff = (
-                self._train_one_epoch(train_loader, device)
+            train_loss, train_per_class_dice = self._train_one_epoch(
+                train_loader, device
             )
-            train_mean_dice, train_mean_hausdorff = self._get_mean_from_results(
-                train_per_class_dice, train_per_class_hausdorff
-            )
+            train_mean_dice = float(np.mean(train_per_class_dice))
             print(
-                f"Train Loss: {train_loss:.4f}, Train mean Dice: {train_mean_dice:.4f}, Train mean Hausdorff: {train_mean_hausdorff}"
+                f"Train Loss: {train_loss:.4f}, Train mean Dice: {train_mean_dice:.4f}"
             )
-            print(
-                f"Train per class Hausdorff (foreground): {train_per_class_hausdorff}"
-            )
+
             self.graph_maker.save_slice(epoch, train_mean_dice, to="train")
 
-            val_loss, val_per_class_dice, val_per_class_hausdorff = self._validate(
-                val_loader, device
-            )
-            val_mean_dice, val_mean_hausdorff = self._get_mean_from_results(
-                val_per_class_dice, val_per_class_hausdorff
-            )
-            print(
-                f"Val Loss: {val_loss:.4f}, Val mean Dice: {val_mean_dice:.4f}, Val mean Hausdorff: {val_mean_hausdorff:.4f}"
-            )
-            print(f"Val per class Hausdorff (foreground): {val_per_class_hausdorff}")
+            val_loss, val_per_class_dice = self._validate(val_loader, device)
+            val_mean_dice = float(np.mean(val_per_class_dice))
+            print(f"Val Loss: {val_loss:.4f}, Val mean Dice: {val_mean_dice:.4f}")
             self.graph_maker.save_slice(epoch, val_mean_dice, to="val")
 
             self.metric_saver.save_entry(
@@ -118,10 +105,6 @@ class Trainer:
                 train_per_class_dice,
                 val_mean_dice,
                 val_per_class_dice,
-                train_mean_hausdorff,
-                train_per_class_hausdorff,
-                val_mean_hausdorff,
-                val_per_class_hausdorff,
             )
             self._save_best_model_if_possible(epoch, val_mean_dice)
 
@@ -202,7 +185,7 @@ class Trainer:
         loss = -alpha_t * focal_term * log_pt
         return loss.mean()
 
-    def _dice_coefficient_per_class(
+    def _dice_score_per_class(
         self,
         logits: torch.Tensor,  # (B, C, D, H, W)
         target: torch.Tensor,  # (B, 1, D, H, W) containing class indices (int)
@@ -225,49 +208,14 @@ class Trainer:
 
         return dice_per_class
 
-    def _hausdorff_metric(
-        self,
-        logits: torch.Tensor,  # (B, C, D, H, W)
-        target: torch.Tensor,  # (B, 1, D, H, W)
-        inf_representation: float = ceil(hypot(160, 240, 240)),
-    ) -> torch.Tensor:
-        """
-        Calculates Hausdorff distance per class for 3D predictions, skipping class 0 (background)
-        Returns tensor with shape (C,) (foreground_classes_cnt,): mean Hausdorff distance per class over the batch.
-        """
-        preds = torch.argmax(logits, dim=1)  # (B, D, H, W)
-        tgt = target.squeeze(1).long()  # (B, D, H, W)
-        foreground_classes_cnt = logits.shape[1] - 1
-
-        hausdorff_per_class = torch.zeros(
-            (logits.shape[0], foreground_classes_cnt), dtype=torch.float32
-        )
-
-        for batch in range(logits.shape[0]):
-            for cls in range(
-                1, foreground_classes_cnt + 1
-            ):  # Start from 1 to avoid background Hausdorff calculation
-                idx = cls - 1
-                pred_mask = (preds[batch] == cls).cpu().numpy().astype(bool)
-                tgt_mask = (tgt[batch] == cls).cpu().numpy().astype(bool)
-
-                distance = hausdorff_distance(pred_mask, tgt_mask)
-                distance = distance if distance is not None else inf_representation
-                distance = min(distance, inf_representation)
-
-                hausdorff_per_class[batch, idx] = distance
-
-        return hausdorff_per_class.mean(dim=0)
-
     def _train_one_epoch(
         self,
         dataloader: DataLoader,
         device: str,
-    ) -> Tuple[float, list[float], list[float]]:
+    ) -> Tuple[float, list[float]]:
         self.model.train()
         epoch_loss_acc: float = 0.0
         dice_scores_per_class: List[torch.Tensor] = []
-        hausdorff_per_class: List[torch.Tensor] = []
 
         with tqdm(dataloader, desc="Training") as progress:
             for i, (images, masks) in enumerate(progress):
@@ -280,11 +228,8 @@ class Trainer:
                 self.optimizer.step()
 
                 with torch.no_grad():
-                    dice_per_class = self._dice_coefficient_per_class(outputs, masks)
-                    hausdorff_metric = self._hausdorff_metric(outputs, masks)
-
+                    dice_per_class = self._dice_score_per_class(outputs, masks)
                     dice_scores_per_class.append(dice_per_class)
-                    hausdorff_per_class.append(hausdorff_metric)
                     epoch_loss_acc += loss.item()
 
                 if i == 0:
@@ -296,25 +241,16 @@ class Trainer:
             torch.stack(dice_scores_per_class).mean(dim=0).cpu().numpy().tolist()
         )
 
-        mean_per_class_hausdorff: list = (
-            torch.stack(hausdorff_per_class).mean(dim=0).cpu().numpy().tolist()
-        )
-
-        return (
-            epoch_loss_acc / max(1, len(dataloader)),
-            mean_per_class_dices,
-            mean_per_class_hausdorff,
-        )
+        return (epoch_loss_acc / max(1, len(dataloader)), mean_per_class_dices)
 
     def _validate(
         self,
         dataloader: DataLoader,
         device: str,
-    ) -> Tuple[float, list[float], list[float]]:
+    ) -> Tuple[float, list[float]]:
         self.model.eval()
         val_loss_acc: float = 0.0
         dice_scores_per_class: List[torch.Tensor] = []
-        hausdorff_per_class: List[torch.Tensor] = []
 
         with torch.no_grad():
             with tqdm(dataloader, desc="Validation") as progress:
@@ -326,10 +262,8 @@ class Trainer:
                     loss = self._focal_loss(outputs, masks, self.focal_param_strategy)
                     val_loss_acc += loss.item()
 
-                    dice_per_class = self._dice_coefficient_per_class(outputs, masks)
-                    hausdorff_metric = self._hausdorff_metric(outputs, masks)
+                    dice_per_class = self._dice_score_per_class(outputs, masks)
                     dice_scores_per_class.append(dice_per_class)
-                    hausdorff_per_class.append(hausdorff_metric)
 
                     if i == random_index:
                         self.graph_maker.set_prediction_and_ground_truth_slice(
@@ -340,20 +274,7 @@ class Trainer:
             torch.stack(dice_scores_per_class).mean(dim=0).cpu().numpy().tolist()
         )
 
-        mean_per_class_hausdorff: list = (
-            torch.stack(hausdorff_per_class).mean(dim=0).cpu().numpy().tolist()
-        )
-
-        return (
-            val_loss_acc / max(1, len(dataloader)),
-            mean_per_class_dices,
-            mean_per_class_hausdorff,
-        )
-
-    def _get_mean_from_results(
-        self, per_class_dice, per_class_hausdorff
-    ) -> Tuple[float, float]:
-        return float(np.mean(per_class_dice)), float(np.mean(per_class_hausdorff))
+        return (val_loss_acc / max(1, len(dataloader)), mean_per_class_dices)
 
     def _save_best_model_if_possible(
         self,

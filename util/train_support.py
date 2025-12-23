@@ -5,7 +5,6 @@ from typing import Any, Dict, Tuple, cast
 import torch
 from torch.utils.data import DataLoader, Subset as TorchSubset
 
-from segmentation.config import CLUSTER_TRAINING_ENABLED
 from segmentation.dataset import BrainTumorDataset
 from segmentation.transforms import train_transforms, val_transforms
 
@@ -179,9 +178,6 @@ def cut_images_and_masks(
 def prepare_images_and_masks(
     images: torch.Tensor, masks: torch.Tensor, device: str
 ) -> Tuple[torch.Tensor, torch.Tensor]:
-    if not CLUSTER_TRAINING_ENABLED:
-        images, masks = cut_images_and_masks(images, masks)
-
     images = images.to(device, non_blocking=True)
     masks = masks.to(device, non_blocking=True)
 

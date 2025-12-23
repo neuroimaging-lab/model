@@ -27,8 +27,8 @@ def example_train(
         model = UNet3D(
             in_channels=4,
             num_classes=4,
-            level_channels=[16, 32, 64],
-            bottleneck_channels=128,
+            level_channels=[32, 64, 128],
+            bottleneck_channels=256,
             dropout_rate=dropout_rate if dropout_rate else 0.0,
         )
 
@@ -45,8 +45,8 @@ def example_train(
 
     trainer.train(
         dataset_dir=DATASET_DIR,
-        total_samples=5,
-        epochs=2,
+        total_samples=20,
+        epochs=10,
         device=device,
         gamma=gamma,
         alpha=alpha,
